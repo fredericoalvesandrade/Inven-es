@@ -244,7 +244,7 @@ function KpiCard({ label, value, color }) {
 // ── Income ────────────────────────────────────────────────────────────────────
 function Income({ house, year, setYear, income, addIncome, delIncome, houses }) {
   const [form, setForm] = useState({
-    month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '',
+    category: INCOME_CATS[0], amount: '', notes: '',
     checkIn: '', checkOut: ''
   })
   const [adding, setAdding] = useState(false)
@@ -255,7 +255,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
   const handleAdd = async () => {
     if (!form.amount) return
     await addIncome({ ...form, house, year })
-    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '', checkIn: '', checkOut: '' })
+    setForm({ category: INCOME_CATS[0], amount: '', notes: '', checkIn: '', checkOut: '' })
     setAdding(false)
   }
 
@@ -291,13 +291,6 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
                 className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Mês</label>
-              <select value={form.month} onChange={e => setForm(f => ({...f, month: Number(e.target.value)}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
-                {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-              </select>
-            </div>
-            <div>
               <label className="text-xs text-gray-500">Categoria</label>
               <select value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}
                 className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
@@ -328,8 +321,8 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
           : <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                 <tr>
-                  <th className="px-4 py-3 text-left">Período</th>
-                  <th className="px-4 py-3 text-left">Mês</th>
+                  <th className="px-4 py-3 text-left">Check-in</th>
+                  <th className="px-4 py-3 text-left">Check-out</th>
                   <th className="px-4 py-3 text-left">Categoria</th>
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3 text-left">Notas</th>
@@ -337,14 +330,10 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {hIncome.sort((a,b) => a.month - b.month).map(i => (
+                {hIncome.sort((a,b) => (a.checkIn || '') > (b.checkIn || '') ? 1 : -1).map(i => (
                   <tr key={i.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-500 text-xs">
-                      {i.checkIn && i.checkOut
-                        ? <>{i.checkIn}<br/>{i.checkOut}</>
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3">{MONTHS[i.month]}</td>
+                    <td className="px-4 py-3 text-gray-600">{i.checkIn || '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{i.checkOut || '—'}</td>
                     <td className="px-4 py-3"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span></td>
                     <td className="px-4 py-3 text-right font-medium text-green-600">{fmt(i.amount)}</td>
                     <td className="px-4 py-3 text-gray-400">{i.notes}</td>
