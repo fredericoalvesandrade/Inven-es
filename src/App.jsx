@@ -8,11 +8,10 @@ import { storage } from './supabase'
 // ── Storage keys ──────────────────────────────────────────────────────────────
 const K_INCOME   = 'income'
 const K_EXPENSES = 'expenses'
-const K_BOOKINGS = 'bookings'
 const K_SETTINGS = 'settings'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const HOUSES = ['Casa 1', 'Casa 2']
+const DEFAULT_HOUSES = ['Casa 1', 'Casa 2']
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 const COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899']
 
@@ -41,8 +40,7 @@ export default function App() {
   const [year, setYear]         = useState(currentYear())
   const [income, setIncome]     = useState([])
   const [expenses, setExpenses] = useState([])
-  const [bookings, setBookings] = useState([])
-  const [settings, setSettings] = useState({ password: '' })
+  const [settings, setSettings] = useState({ password: '', houses: DEFAULT_HOUSES })
   const [loading, setLoading]   = useState(true)
   const [auth, setAuth]         = useState(false)
   const [pwInput, setPwInput]   = useState('')
@@ -51,16 +49,15 @@ export default function App() {
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
-      const [inc, exp, bkn, set_] = await Promise.all([
+      const [inc, exp, set_] = await Promise.all([
         storage.get(K_INCOME),
         storage.get(K_EXPENSES),
-        storage.get(K_BOOKINGS),
         storage.get(K_SETTINGS)
       ])
       setIncome(inc   ? JSON.parse(inc.value)   : [])
       setExpenses(exp ? JSON.parse(exp.value)   : [])
-      setBookings(bkn ? JSON.parse(bkn.value)   : [])
-      const s = set_ ? JSON.parse(set_.value) : { password: '' }
+      const s = set_ ? JSON.parse(set_.value) : { password: '', houses: DEFAULT_HOUSES }
+      if (!s.houses) s.houses = DEFAULT_HOUSES
       setSettings(s)
       if (!s.password) setAuth(true)
       setLoading(false)
@@ -68,10 +65,11 @@ export default function App() {
     load()
   }, [])
 
+  const houses = settings.houses || DEFAULT_HOUSES
+
   // ── Persist helpers ────────────────────────────────────────────────────────
   const saveIncome   = useCallback(async d => { await storage.set(K_INCOME,   JSON.stringify(d)) }, [])
   const saveExpenses = useCallback(async d => { await storage.set(K_EXPENSES, JSON.stringify(d)) }, [])
-  const saveBookings = useCallback(async d => { await storage.set(K_BOOKINGS, JSON.stringify(d)) }, [])
   const saveSettings = useCallback(async d => { await storage.set(K_SETTINGS, JSON.stringify(d)) }, [])
 
   const addIncome = async entry => {
@@ -89,14 +87,6 @@ export default function App() {
   const delExpense = async id => {
     const next = expenses.filter(e => e.id !== id)
     setExpenses(next); await saveExpenses(next)
-  }
-  const addBooking = async entry => {
-    const next = [...bookings, { ...entry, id: genId() }]
-    setBookings(next); await saveBookings(next)
-  }
-  const delBooking = async id => {
-    const next = bookings.filter(b => b.id !== id)
-    setBookings(next); await saveBookings(next)
   }
 
   const handleLogin = () => {
@@ -132,8 +122,8 @@ export default function App() {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-bold text-gray-800">🏡 Gestão Casas SMP</h1>
-          <div className="flex gap-2">
-            {HOUSES.map((h, i) => (
+          <div className="flex gap-2 flex-wrap">
+            {houses.map((h, i) => (
               <button key={i}
                 onClick={() => setHouse(i)}
                 className={`px-3 py-1 rounded-full text-sm font-medium transition ${house === i ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
@@ -146,7 +136,6 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 flex gap-1 pb-0">
           {[
             { key: 'dashboard', label: '📊 Dashboard' },
-            { key: 'calendar',  label: '📅 Calendário' },
             { key: 'income',    label: '💰 Rendimentos' },
             { key: 'expenses',  label: '💸 Despesas' },
             { key: 'settings',  label: '⚙️ Definições' },
@@ -161,11 +150,10 @@ export default function App() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {tab === 'dashboard'  && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} bookings={bookings} />}
-        {tab === 'calendar'   && <Calendar   house={house} year={year} setYear={setYear} bookings={bookings} addBooking={addBooking} delBooking={delBooking} />}
-        {tab === 'income'     && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} />}
-        {tab === 'expenses'   && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} />}
-        {tab === 'settings'   && <Settings   settings={settings} setSettings={setSettings} saveSettings={saveSettings} />}
+        {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} />}
+        {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} houses={houses} />}
+        {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} houses={houses} />}
+        {tab === 'settings'  && <Settings   settings={settings} setSettings={setSettings} saveSettings={saveSettings} />}
       </main>
     </div>
   )
@@ -183,15 +171,13 @@ function YearSelector({ year, setYear }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({ house, year, setYear, income, expenses, bookings }) {
+function Dashboard({ house, year, setYear, income, expenses, houses }) {
   const hIncome   = income.filter(i   => i.house === house && Number(i.year) === year)
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
-  const hBookings = bookings.filter(b => b.house === house && Number(b.year) === year)
 
   const totalIncome   = hIncome.reduce((s, i) => s + Number(i.amount), 0)
   const totalExpenses = hExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const profit        = totalIncome - totalExpenses
-  const occupancy     = calcOccupancy(hBookings, year)
 
   const monthlyData = MONTHS.map((m, idx) => ({
     name: m,
@@ -207,15 +193,14 @@ function Dashboard({ house, year, setYear, income, expenses, bookings }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-800">Dashboard — {HOUSES[house]}</h2>
+        <h2 className="text-lg font-bold text-gray-800">Dashboard — {houses[house]}</h2>
         <YearSelector year={year} setYear={setYear} />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <KpiCard label="Rendimento" value={fmt(totalIncome)} color="text-green-600" />
         <KpiCard label="Despesas"   value={fmt(totalExpenses)} color="text-red-500" />
         <KpiCard label="Lucro"      value={fmt(profit)} color={profit >= 0 ? 'text-indigo-600' : 'text-red-600'} />
-        <KpiCard label="Ocupação"   value={`${occupancy}%`} color="text-amber-600" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -275,122 +260,12 @@ function KpiCard({ label, value, color }) {
   )
 }
 
-function calcOccupancy(bookings, year) {
-  const daysInYear = ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365
-  let booked = 0
-  bookings.forEach(b => {
-    const diff = Math.max(0, Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / 86400000))
-    booked += diff
-  })
-  return Math.min(100, Math.round((booked / daysInYear) * 100))
-}
-
-// ── Calendar ──────────────────────────────────────────────────────────────────
-function Calendar({ house, year, setYear, bookings, addBooking, delBooking }) {
-  const [form, setForm] = useState({ checkIn: '', checkOut: '', guest: '', notes: '', amount: '' })
-  const [adding, setAdding] = useState(false)
-
-  const hBookings = bookings.filter(b => b.house === house && Number(b.year) === year)
-
-  const handleAdd = async () => {
-    if (!form.checkIn || !form.checkOut || !form.guest) return
-    await addBooking({ ...form, house, year })
-    setForm({ checkIn: '', checkOut: '', guest: '', notes: '', amount: '' })
-    setAdding(false)
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-800">Calendário — {HOUSES[house]}</h2>
-        <div className="flex items-center gap-3">
-          <YearSelector year={year} setYear={setYear} />
-          <button onClick={() => setAdding(true)} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-indigo-700">
-            + Reserva
-          </button>
-        </div>
-      </div>
-
-      {adding && (
-        <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
-          <h3 className="font-semibold text-gray-700">Nova Reserva</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500">Check-in</label>
-              <input type="date" value={form.checkIn} onChange={e => setForm(f => ({...f, checkIn: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Check-out</label>
-              <input type="date" value={form.checkOut} onChange={e => setForm(f => ({...f, checkOut: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Hóspede</label>
-              <input type="text" placeholder="Nome" value={form.guest} onChange={e => setForm(f => ({...f, guest: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Valor (€)</label>
-              <input type="number" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs text-gray-500">Notas</label>
-              <input type="text" placeholder="Opcional" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700">Guardar</button>
-            <button onClick={() => setAdding(false)} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {hBookings.length === 0
-          ? <p className="text-gray-400 text-sm p-6 text-center">Sem reservas em {year}</p>
-          : <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                <tr>
-                  <th className="px-4 py-3 text-left">Check-in</th>
-                  <th className="px-4 py-3 text-left">Check-out</th>
-                  <th className="px-4 py-3 text-left">Hóspede</th>
-                  <th className="px-4 py-3 text-left">Noites</th>
-                  <th className="px-4 py-3 text-right">Valor</th>
-                  <th className="px-4 py-3 text-left">Notas</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {hBookings.sort((a,b) => a.checkIn > b.checkIn ? 1 : -1).map(b => {
-                  const nights = Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / 86400000)
-                  return (
-                    <tr key={b.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{b.checkIn}</td>
-                      <td className="px-4 py-3">{b.checkOut}</td>
-                      <td className="px-4 py-3 font-medium">{b.guest}</td>
-                      <td className="px-4 py-3">{nights}n</td>
-                      <td className="px-4 py-3 text-right text-green-600 font-medium">{b.amount ? fmt(b.amount) : '—'}</td>
-                      <td className="px-4 py-3 text-gray-400">{b.notes}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => delBooking(b.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-        }
-      </div>
-    </div>
-  )
-}
-
 // ── Income ────────────────────────────────────────────────────────────────────
-function Income({ house, year, setYear, income, addIncome, delIncome }) {
-  const [form, setForm] = useState({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '' })
+function Income({ house, year, setYear, income, addIncome, delIncome, houses }) {
+  const [form, setForm] = useState({
+    month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '',
+    checkIn: '', checkOut: ''
+  })
   const [adding, setAdding] = useState(false)
 
   const hIncome = income.filter(i => i.house === house && Number(i.year) === year)
@@ -399,14 +274,14 @@ function Income({ house, year, setYear, income, addIncome, delIncome }) {
   const handleAdd = async () => {
     if (!form.amount) return
     await addIncome({ ...form, house, year })
-    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '' })
+    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '', checkIn: '', checkOut: '' })
     setAdding(false)
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-800">Rendimentos — {HOUSES[house]}</h2>
+        <h2 className="text-lg font-bold text-gray-800">Rendimentos — {houses[house]}</h2>
         <div className="flex items-center gap-3">
           <YearSelector year={year} setYear={setYear} />
           <button onClick={() => setAdding(true)} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-indigo-700">
@@ -424,6 +299,16 @@ function Income({ house, year, setYear, income, addIncome, delIncome }) {
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Novo Rendimento</h3>
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500">Check-in</label>
+              <input type="date" value={form.checkIn} onChange={e => setForm(f => ({...f, checkIn: e.target.value}))}
+                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Check-out</label>
+              <input type="date" value={form.checkOut} onChange={e => setForm(f => ({...f, checkOut: e.target.value}))}
+                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+            </div>
             <div>
               <label className="text-xs text-gray-500">Mês</label>
               <select value={form.month} onChange={e => setForm(f => ({...f, month: Number(e.target.value)}))}
@@ -462,6 +347,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome }) {
           : <table className="w-full text-sm">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                 <tr>
+                  <th className="px-4 py-3 text-left">Período</th>
                   <th className="px-4 py-3 text-left">Mês</th>
                   <th className="px-4 py-3 text-left">Categoria</th>
                   <th className="px-4 py-3 text-right">Valor</th>
@@ -472,6 +358,11 @@ function Income({ house, year, setYear, income, addIncome, delIncome }) {
               <tbody className="divide-y">
                 {hIncome.sort((a,b) => a.month - b.month).map(i => (
                   <tr key={i.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      {i.checkIn && i.checkOut
+                        ? <>{i.checkIn}<br/>{i.checkOut}</>
+                        : '—'}
+                    </td>
                     <td className="px-4 py-3">{MONTHS[i.month]}</td>
                     <td className="px-4 py-3"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span></td>
                     <td className="px-4 py-3 text-right font-medium text-green-600">{fmt(i.amount)}</td>
@@ -484,7 +375,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome }) {
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan={2} className="px-4 py-3 font-semibold text-gray-600">Total</td>
+                  <td colSpan={3} className="px-4 py-3 font-semibold text-gray-600">Total</td>
                   <td className="px-4 py-3 text-right font-bold text-green-600">{fmt(total)}</td>
                   <td colSpan={2}></td>
                 </tr>
@@ -497,7 +388,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome }) {
 }
 
 // ── Expenses ──────────────────────────────────────────────────────────────────
-function Expenses({ house, year, setYear, expenses, addExpense, delExpense }) {
+function Expenses({ house, year, setYear, expenses, addExpense, delExpense, houses }) {
   const [form, setForm] = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
   const [adding, setAdding] = useState(false)
 
@@ -514,7 +405,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-800">Despesas — {HOUSES[house]}</h2>
+        <h2 className="text-lg font-bold text-gray-800">Despesas — {houses[house]}</h2>
         <div className="flex items-center gap-3">
           <YearSelector year={year} setYear={setYear} />
           <button onClick={() => setAdding(true)} className="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-amber-600">
@@ -606,23 +497,80 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense }) {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 function Settings({ settings, setSettings, saveSettings }) {
-  const [pw, setPw]       = useState(settings.password || '')
-  const [saved, setSaved] = useState(false)
+  const [pw, setPw]         = useState(settings.password || '')
+  const [houses, setHouses] = useState(settings.houses || DEFAULT_HOUSES)
+  const [saved, setSaved]   = useState(false)
+  const [newHouse, setNewHouse] = useState('')
 
   const handleSave = async () => {
-    const next = { ...settings, password: pw }
+    const next = { ...settings, password: pw, houses }
     setSettings(next)
     await saveSettings(next)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const updateHouseName = (i, val) => {
+    const next = [...houses]
+    next[i] = val
+    setHouses(next)
+  }
+
+  const addHouse = () => {
+    if (!newHouse.trim()) return
+    setHouses(h => [...h, newHouse.trim()])
+    setNewHouse('')
+  }
+
+  const removeHouse = i => {
+    if (houses.length <= 1) return
+    setHouses(h => h.filter((_, idx) => idx !== i))
+  }
+
   return (
     <div className="max-w-md space-y-4">
       <h2 className="text-lg font-bold text-gray-800">Definições</h2>
+
+      {/* Casas */}
+      <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
+        <h3 className="font-semibold text-gray-700">Casas</h3>
+        <div className="space-y-2">
+          {houses.map((h, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <input
+                type="text"
+                value={h}
+                onChange={e => updateHouseName(i, e.target.value)}
+                className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+              />
+              <button
+                onClick={() => removeHouse(i)}
+                disabled={houses.length <= 1}
+                className="text-red-400 hover:text-red-600 disabled:opacity-30 text-sm px-2">
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Nome da nova casa"
+            value={newHouse}
+            onChange={e => setNewHouse(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addHouse()}
+            className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+          />
+          <button onClick={addHouse} className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-sm">
+            + Adicionar
+          </button>
+        </div>
+      </div>
+
+      {/* Password */}
       <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
         <h3 className="font-semibold text-gray-700">Password de acesso</h3>
-        <p className="text-sm text-gray-500">Define uma password para proteger o acesso à app. Se ficar em branco, não é pedida autenticação.</p>
+        <p className="text-sm text-gray-500">Se ficar em branco, não é pedida autenticação.</p>
         <input
           type="text"
           placeholder="Password"
@@ -630,10 +578,11 @@ function Settings({ settings, setSettings, saveSettings }) {
           onChange={e => setPw(e.target.value)}
           className="w-full border rounded-lg px-3 py-2 text-sm"
         />
-        <button onClick={handleSave} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
-          {saved ? '✓ Guardado' : 'Guardar'}
-        </button>
       </div>
+
+      <button onClick={handleSave} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
+        {saved ? '✓ Guardado' : 'Guardar alterações'}
+      </button>
     </div>
   )
 }
