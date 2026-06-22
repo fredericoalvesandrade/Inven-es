@@ -12,8 +12,8 @@ const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov
 const COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#ec4899']
 
 const EXPENSE_CATS = [
-  'Manutenção','Limpeza','Água','Eletricidade','Internet','Condomínio',
-  'Seguros','IMI','Comissões','Publicidade','Outros'
+  'Eletricidade','TV + NET','Água','Limpeza','Gás',
+  'Manutenção (Obras, etc.)','Impostos','Comissões','Outros'
 ]
 
 const INCOME_CATS = ['Airbnb','Booking.com','Direto','Outros']
