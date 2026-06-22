@@ -1,8 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
-} from 'recharts'
 import { storage } from './supabase'
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
@@ -179,12 +175,6 @@ function Dashboard({ house, year, setYear, income, expenses, houses }) {
   const totalExpenses = hExpenses.reduce((s, e) => s + Number(e.amount), 0)
   const profit        = totalIncome - totalExpenses
 
-  const monthlyData = MONTHS.map((m, idx) => ({
-    name: m,
-    Rendimento: hIncome.filter(i => Number(i.month) === idx).reduce((s, i) => s + Number(i.amount), 0),
-    Despesa:    hExpenses.filter(e => Number(e.month) === idx).reduce((s, e) => s + Number(e.amount), 0),
-  }))
-
   const expByCat = EXPENSE_CATS.map(cat => ({
     name: cat,
     value: hExpenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0)
@@ -203,49 +193,40 @@ function Dashboard({ house, year, setYear, income, expenses, houses }) {
         <KpiCard label="Lucro"      value={fmt(profit)} color={profit >= 0 ? 'text-indigo-600' : 'text-red-600'} />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h3 className="font-semibold text-gray-700 mb-4">Rendimento vs Despesa</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={v => fmt(v)} />
-              <Legend />
-              <Bar dataKey="Rendimento" fill="#6366f1" radius={[4,4,0,0]} />
-              <Bar dataKey="Despesa"    fill="#f59e0b" radius={[4,4,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Resumo de reservas */}
+      <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <h3 className="font-semibold text-gray-700">Reservas {year}</h3>
+        <div className="flex items-center justify-between border-b pb-3">
+          <span className="text-gray-500 text-sm">Número de reservas</span>
+          <span className="font-bold text-gray-800">{hIncome.length}</span>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-gray-500 text-sm">Total de rendimentos</span>
+          <span className="font-bold text-green-600">{fmt(totalIncome)}</span>
+        </div>
+      </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <h3 className="font-semibold text-gray-700 mb-4">Despesas por Categoria</h3>
-          {expByCat.length === 0
-            ? <p className="text-gray-400 text-sm mt-8 text-center">Sem despesas registadas</p>
-            : <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={d => d.name}>
-                    {expByCat.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={v => fmt(v)} />
-                </PieChart>
-              </ResponsiveContainer>
-          }
-        </div>
-
-        <div className="bg-white rounded-xl p-4 shadow-sm md:col-span-2">
-          <h3 className="font-semibold text-gray-700 mb-4">Lucro mensal</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={monthlyData.map(d => ({ ...d, Lucro: d.Rendimento - d.Despesa }))} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={v => fmt(v)} />
-              <Line type="monotone" dataKey="Lucro" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      {/* Despesas por categoria */}
+      <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <h3 className="font-semibold text-gray-700">Despesas por Categoria {year}</h3>
+        {expByCat.length === 0
+          ? <p className="text-gray-400 text-sm text-center py-4">Sem despesas registadas</p>
+          : <div className="space-y-2">
+              {expByCat.map((cat, i) => (
+                <div key={cat.name} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                    <span className="text-sm text-gray-700">{cat.name}</span>
+                  </div>
+                  <span className="font-medium text-amber-600">{fmt(cat.value)}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between pt-2 font-semibold">
+                <span className="text-gray-600">Total</span>
+                <span className="text-amber-700">{fmt(totalExpenses)}</span>
+              </div>
+            </div>
+        }
       </div>
     </div>
   )
