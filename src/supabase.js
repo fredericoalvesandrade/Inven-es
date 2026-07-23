@@ -20,10 +20,45 @@ export const storage = {
   }
 }
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10 MB
+
+async function compressImage(file, maxPx = 1920, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width <= maxPx && height <= maxPx && file.size < 500_000) {
+        resolve(file) // already small enough
+        return
+      }
+      const scale = Math.min(1, maxPx / Math.max(width, height))
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(width  * scale)
+      canvas.height = Math.round(height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(blob => {
+        if (!blob) { resolve(file); return }
+        resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }))
+      }, 'image/jpeg', quality)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+    img.src = url
+  })
+}
+
 export async function uploadFile(file, path) {
-  const { data, error } = await supabase.storage
+  if (file.size > MAX_FILE_BYTES) throw new Error('Ficheiro demasiado grande (máx. 10 MB)')
+  let toUpload = file
+  if (file.type.startsWith('image/')) {
+    toUpload = await compressImage(file)
+    // update path extension for compressed images
+    path = path.replace(/\.\w+$/, '.jpg')
+  }
+  const { error } = await supabase.storage
     .from('attachments')
-    .upload(path, file, { upsert: true })
+    .upload(path, toUpload, { upsert: true })
   if (error) throw error
   const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path)
   return urlData.publicUrl

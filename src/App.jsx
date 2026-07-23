@@ -379,42 +379,48 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
   const [editId, setEditId]     = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState(null)
 
   const hIncome = income.filter(i => i.house === house && Number(i.year) === year)
   const total   = hIncome.reduce((s, i) => s + parseAmount(i.amount), 0)
 
   const handleAdd = async () => {
     if (!form.amount) return
-    setUploading(true)
-    let attachmentUrl = null, attachmentName = null
-    if (form.file) {
-      const path = `income/${genId()}_${form.file.name}`
-      attachmentUrl = await uploadFile(form.file, path)
-      attachmentName = form.file.name
-    }
-    await addIncome({ ...form, house, year, attachmentUrl, attachmentName, file: undefined })
-    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '', file: null })
-    setAdding(false)
+    setUploading(true); setUploadError(null)
+    try {
+      let attachmentUrl = null, attachmentName = null
+      if (form.file) {
+        const path = `income/${genId()}_${form.file.name}`
+        attachmentUrl = await uploadFile(form.file, path)
+        attachmentName = form.file.name
+      }
+      await addIncome({ ...form, house, year, attachmentUrl, attachmentName, file: undefined })
+      setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '', file: null })
+      setAdding(false)
+    } catch (e) { setUploadError(e.message) }
     setUploading(false)
   }
 
   const startEdit = i => {
     setEditId(i.id)
+    setUploadError(null)
     setEditForm({ month: i.month, category: i.category, amount: String(i.amount), notes: i.notes || '', attachmentUrl: i.attachmentUrl || null, attachmentName: i.attachmentName || null, file: null })
   }
 
   const handleEdit = async () => {
     if (!editForm.amount) return
-    setUploading(true)
-    let attachmentUrl = editForm.attachmentUrl
-    let attachmentName = editForm.attachmentName
-    if (editForm.file) {
-      const path = `income/${genId()}_${editForm.file.name}`
-      attachmentUrl = await uploadFile(editForm.file, path)
-      attachmentName = editForm.file.name
-    }
-    await editIncome(editId, { ...editForm, attachmentUrl, attachmentName, file: undefined })
-    setEditId(null); setEditForm(null)
+    setUploading(true); setUploadError(null)
+    try {
+      let attachmentUrl = editForm.attachmentUrl
+      let attachmentName = editForm.attachmentName
+      if (editForm.file) {
+        const path = `income/${genId()}_${editForm.file.name}`
+        attachmentUrl = await uploadFile(editForm.file, path)
+        attachmentName = editForm.file.name
+      }
+      await editIncome(editId, { ...editForm, attachmentUrl, attachmentName, file: undefined })
+      setEditId(null); setEditForm(null)
+    } catch (e) { setUploadError(e.message) }
     setUploading(false)
   }
 
@@ -440,7 +446,8 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
       {adding && (
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Novo Rendimento</h3>
-          <IncomeForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" uploading={uploading} />
+          <IncomeForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => { setAdding(false); setUploadError(null) }} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" uploading={uploading} />
+          {uploadError && <p className="text-red-500 text-xs">{uploadError}</p>}
         </div>
       )}
 
@@ -455,6 +462,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
                     ? <div className="space-y-3">
                         <p className="font-semibold text-gray-700 text-sm">Editar rendimento</p>
                         <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" uploading={uploading} />
+                        {uploadError && <p className="text-red-500 text-xs">{uploadError}</p>}
                       </div>
                     : <div className="flex justify-between items-start">
                         <div className="space-y-1">
@@ -582,47 +590,53 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
   const [editId, setEditId]     = useState(null)
   const [editForm, setEditForm] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState(null)
 
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
   const total     = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
 
   const handleAdd = async () => {
     if (!form.amount) return
-    setUploading(true)
-    let attachmentUrl = null, attachmentName = null
-    if (form.file) {
-      const path = `expenses/${genId()}_${form.file.name}`
-      attachmentUrl = await uploadFile(form.file, path)
-      attachmentName = form.file.name
-    }
-    await addExpense({ ...form, house, year, attachmentUrl, attachmentName, file: undefined })
-    setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '', file: null })
-    setAdding(false)
+    setUploading(true); setUploadError(null)
+    try {
+      let attachmentUrl = null, attachmentName = null
+      if (form.file) {
+        const path = `expenses/${genId()}_${form.file.name}`
+        attachmentUrl = await uploadFile(form.file, path)
+        attachmentName = form.file.name
+      }
+      await addExpense({ ...form, house, year, attachmentUrl, attachmentName, file: undefined })
+      setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '', file: null })
+      setAdding(false)
+    } catch (e) { setUploadError(e.message) }
     setUploading(false)
   }
 
   const startEdit = e => {
     setEditId(e.id)
+    setUploadError(null)
     setEditForm({ month: e.month, category: e.category, amount: String(e.amount), notes: e.notes || '', attachmentUrl: e.attachmentUrl || null, attachmentName: e.attachmentName || null, file: null })
   }
 
   const handleEdit = async () => {
     if (!editForm.amount) return
-    setUploading(true)
-    let attachmentUrl = editForm.attachmentUrl
-    let attachmentName = editForm.attachmentName
-    if (editForm.file) {
-      const path = `expenses/${genId()}_${editForm.file.name}`
-      attachmentUrl = await uploadFile(editForm.file, path)
-      attachmentName = editForm.file.name
-    }
-    await editExpense(editId, { ...editForm, attachmentUrl, attachmentName, file: undefined })
-    setEditId(null)
-    setEditForm(null)
+    setUploading(true); setUploadError(null)
+    try {
+      let attachmentUrl = editForm.attachmentUrl
+      let attachmentName = editForm.attachmentName
+      if (editForm.file) {
+        const path = `expenses/${genId()}_${editForm.file.name}`
+        attachmentUrl = await uploadFile(editForm.file, path)
+        attachmentName = editForm.file.name
+      }
+      await editExpense(editId, { ...editForm, attachmentUrl, attachmentName, file: undefined })
+      setEditId(null)
+      setEditForm(null)
+    } catch (e) { setUploadError(e.message) }
     setUploading(false)
   }
 
-  const cancelEdit = () => { setEditId(null); setEditForm(null) }
+  const cancelEdit = () => { setEditId(null); setEditForm(null); setUploadError(null) }
 
   return (
     <div className="space-y-4">
@@ -644,7 +658,8 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
       {adding && (
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Nova Despesa</h3>
-          <ExpenseForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" uploading={uploading} />
+          <ExpenseForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => { setAdding(false); setUploadError(null) }} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" uploading={uploading} />
+          {uploadError && <p className="text-red-500 text-xs">{uploadError}</p>}
         </div>
       )}
 
@@ -659,6 +674,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
                     ? <div className="space-y-3">
                         <p className="font-semibold text-gray-700 text-sm">Editar despesa</p>
                         <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" uploading={uploading} />
+                        {uploadError && <p className="text-red-500 text-xs">{uploadError}</p>}
                       </div>
                     : <div className="flex justify-between items-start">
                         <div className="space-y-1">
