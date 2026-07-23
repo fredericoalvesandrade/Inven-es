@@ -16,7 +16,7 @@ const EXPENSE_CATS = [
   'Manutenção (Obras, etc.)','Impostos','Comissões','Outros'
 ]
 
-const INCOME_CATS = ['Airbnb','Booking.com','Direto','Outros']
+const INCOME_CATS = ['SmartHomes','Particular','Outros']
 
 function currentYear() { return new Date().getFullYear() }
 function currentMonth() { return new Date().getMonth() }
@@ -78,6 +78,10 @@ export default function App() {
   }
   const delIncome = async id => {
     const next = income.filter(i => i.id !== id)
+    setIncome(next); await saveIncome(next)
+  }
+  const editIncome = async (id, fields) => {
+    const next = income.map(i => i.id === id ? { ...i, ...fields } : i)
     setIncome(next); await saveIncome(next)
   }
   const addExpense = async entry => {
@@ -155,7 +159,7 @@ export default function App() {
 
       <main className="max-w-6xl mx-auto px-4 py-6">
         {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} />}
-        {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} houses={houses} />}
+        {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} editIncome={editIncome} houses={houses} />}
         {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} editExpense={editExpense} houses={houses} />}
         {tab === 'settings'  && <Settings   settings={settings} setSettings={setSettings} saveSettings={saveSettings} />}
       </main>
@@ -249,13 +253,48 @@ function KpiCard({ label, value, color }) {
   )
 }
 
+// ── Income form ───────────────────────────────────────────────────────────────
+function IncomeForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="text-xs text-gray-500">Mês</label>
+        <select value={data.month} onChange={e => setData(f => ({...f, month: Number(e.target.value)}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Categoria</label>
+        <select value={data.category} onChange={e => setData(f => ({...f, category: e.target.value}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          {INCOME_CATS.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Valor (€)</label>
+        <input type="text" inputMode="decimal" placeholder="0" value={data.amount} onChange={e => setData(f => ({...f, amount: e.target.value}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Notas</label>
+        <input type="text" placeholder="Opcional" value={data.notes} onChange={e => setData(f => ({...f, notes: e.target.value}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+      </div>
+      <div className="col-span-2 flex gap-2">
+        <button onClick={onSave} className={`${saveClass} text-white px-4 py-1.5 rounded-lg text-sm`}>{saveLabel}</button>
+        <button onClick={onCancel} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Income ────────────────────────────────────────────────────────────────────
-function Income({ house, year, setYear, income, addIncome, delIncome, houses }) {
-  const [form, setForm] = useState({
-    category: INCOME_CATS[0], amount: '', notes: '',
-    checkIn: '', checkOut: ''
-  })
+function Income({ house, year, setYear, income, addIncome, delIncome, editIncome, houses }) {
+  const [form, setForm]     = useState({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '' })
   const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState(null)
 
   const hIncome = income.filter(i => i.house === house && Number(i.year) === year)
   const total   = hIncome.reduce((s, i) => s + parseAmount(i.amount), 0)
@@ -263,9 +302,22 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
   const handleAdd = async () => {
     if (!form.amount) return
     await addIncome({ ...form, house, year })
-    setForm({ category: INCOME_CATS[0], amount: '', notes: '', checkIn: '', checkOut: '' })
+    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '' })
     setAdding(false)
   }
+
+  const startEdit = i => {
+    setEditId(i.id)
+    setEditForm({ month: i.month, category: i.category, amount: String(i.amount), notes: i.notes || '' })
+  }
+
+  const handleEdit = async () => {
+    if (!editForm.amount) return
+    await editIncome(editId, editForm)
+    setEditId(null); setEditForm(null)
+  }
+
+  const cancelEdit = () => { setEditId(null); setEditForm(null) }
 
   return (
     <div className="space-y-4">
@@ -287,39 +339,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
       {adding && (
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Novo Rendimento</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500">Check-in</label>
-              <input type="date" value={form.checkIn} onChange={e => setForm(f => ({...f, checkIn: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Check-out</label>
-              <input type="date" value={form.checkOut} onChange={e => setForm(f => ({...f, checkOut: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Categoria</label>
-              <select value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
-                {INCOME_CATS.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Valor (€)</label>
-              <input type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Notas</label>
-              <input type="text" placeholder="Opcional" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700">Guardar</button>
-            <button onClick={() => setAdding(false)} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
-          </div>
+          <IncomeForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" />
         </div>
       )}
 
@@ -328,23 +348,26 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
         : <>
             {/* Cartões — mobile */}
             <div className="space-y-3 md:hidden">
-              {hIncome.sort((a,b) => (a.checkIn || '') > (b.checkIn || '') ? 1 : -1).map(i => (
+              {hIncome.sort((a,b) => a.month - b.month).map(i => (
                 <div key={i.id} className="bg-white rounded-xl p-4 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <div className="flex gap-2 text-sm text-gray-600">
-                        <span>{i.checkIn || '—'}</span>
-                        <span>→</span>
-                        <span>{i.checkOut || '—'}</span>
+                  {editId === i.id
+                    ? <div className="space-y-3">
+                        <p className="font-semibold text-gray-700 text-sm">Editar rendimento</p>
+                        <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" />
                       </div>
-                      <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span>
-                      {i.notes && <p className="text-xs text-gray-400">{i.notes}</p>}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-green-600">{fmt(i.amount)}</span>
-                      <button onClick={() => delIncome(i.id)} className="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
-                    </div>
-                  </div>
+                    : <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-600">{MONTHS[i.month]}</p>
+                          <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span>
+                          {i.notes && <p className="text-xs text-gray-400">{i.notes}</p>}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-green-600">{fmt(i.amount)}</span>
+                          <button onClick={() => startEdit(i)} className="text-indigo-400 hover:text-indigo-600 text-lg leading-none">✎</button>
+                          <button onClick={() => delIncome(i.id)} className="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+                        </div>
+                      </div>
+                  }
                 </div>
               ))}
               <div className="bg-indigo-50 rounded-xl p-4 flex justify-between font-semibold">
@@ -358,8 +381,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                   <tr>
-                    <th className="px-4 py-3 text-left">Check-in</th>
-                    <th className="px-4 py-3 text-left">Check-out</th>
+                    <th className="px-4 py-3 text-left">Mês</th>
                     <th className="px-4 py-3 text-left">Categoria</th>
                     <th className="px-4 py-3 text-right">Valor</th>
                     <th className="px-4 py-3 text-left">Notas</th>
@@ -367,22 +389,30 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {hIncome.sort((a,b) => (a.checkIn || '') > (b.checkIn || '') ? 1 : -1).map(i => (
-                    <tr key={i.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">{i.checkIn || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{i.checkOut || '—'}</td>
-                      <td className="px-4 py-3"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span></td>
-                      <td className="px-4 py-3 text-right font-medium text-green-600">{fmt(i.amount)}</td>
-                      <td className="px-4 py-3 text-gray-400">{i.notes}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => delIncome(i.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                      </td>
-                    </tr>
+                  {hIncome.sort((a,b) => a.month - b.month).map(i => (
+                    editId === i.id
+                      ? <tr key={i.id} className="bg-indigo-50">
+                          <td colSpan={5} className="px-4 py-3">
+                            <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" />
+                          </td>
+                        </tr>
+                      : <tr key={i.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">{MONTHS[i.month]}</td>
+                          <td className="px-4 py-3"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span></td>
+                          <td className="px-4 py-3 text-right font-medium text-green-600">{fmt(i.amount)}</td>
+                          <td className="px-4 py-3 text-gray-400">{i.notes}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => startEdit(i)} className="text-indigo-400 hover:text-indigo-600 text-xs">✎</button>
+                              <button onClick={() => delIncome(i.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            </div>
+                          </td>
+                        </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={3} className="px-4 py-3 font-semibold text-gray-600">Total</td>
+                    <td colSpan={2} className="px-4 py-3 font-semibold text-gray-600">Total</td>
                     <td className="px-4 py-3 text-right font-bold text-green-600">{fmt(total)}</td>
                     <td colSpan={2}></td>
                   </tr>
