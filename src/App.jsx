@@ -88,6 +88,10 @@ export default function App() {
     const next = expenses.filter(e => e.id !== id)
     setExpenses(next); await saveExpenses(next)
   }
+  const editExpense = async (id, fields) => {
+    const next = expenses.map(e => e.id === id ? { ...e, ...fields } : e)
+    setExpenses(next); await saveExpenses(next)
+  }
 
   const handleLogin = () => {
     if (pwInput === settings.password) { setAuth(true); setPwError(false) }
@@ -152,7 +156,7 @@ export default function App() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} />}
         {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} houses={houses} />}
-        {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} houses={houses} />}
+        {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} editExpense={editExpense} houses={houses} />}
         {tab === 'settings'  && <Settings   settings={settings} setSettings={setSettings} saveSettings={saveSettings} />}
       </main>
     </div>
@@ -392,9 +396,11 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
 }
 
 // ── Expenses ──────────────────────────────────────────────────────────────────
-function Expenses({ house, year, setYear, expenses, addExpense, delExpense, houses }) {
-  const [form, setForm] = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
+function Expenses({ house, year, setYear, expenses, addExpense, delExpense, editExpense, houses }) {
+  const [form, setForm]     = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
   const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState(null)
 
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
   const total     = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
@@ -405,6 +411,53 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, hous
     setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
     setAdding(false)
   }
+
+  const startEdit = e => {
+    setEditId(e.id)
+    setEditForm({ month: e.month, category: e.category, amount: String(e.amount), notes: e.notes || '' })
+  }
+
+  const handleEdit = async () => {
+    if (!editForm.amount) return
+    await editExpense(editId, editForm)
+    setEditId(null)
+    setEditForm(null)
+  }
+
+  const cancelEdit = () => { setEditId(null); setEditForm(null) }
+
+  const ExpenseForm = ({ data, setData, onSave, onCancel, saveLabel, saveClass }) => (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="text-xs text-gray-500">Mês</label>
+        <select value={data.month} onChange={e => setData(f => ({...f, month: Number(e.target.value)}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Categoria</label>
+        <select value={data.category} onChange={e => setData(f => ({...f, category: e.target.value}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          {EXPENSE_CATS.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Valor (€)</label>
+        <input type="text" inputMode="decimal" placeholder="0" value={data.amount} onChange={e => setData(f => ({...f, amount: e.target.value}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500">Notas</label>
+        <input type="text" placeholder="Opcional" value={data.notes} onChange={e => setData(f => ({...f, notes: e.target.value}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+      </div>
+      <div className="col-span-2 flex gap-2">
+        <button onClick={onSave} className={`${saveClass} text-white px-4 py-1.5 rounded-lg text-sm`}>{saveLabel}</button>
+        <button onClick={onCancel} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="space-y-4">
@@ -426,36 +479,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, hous
       {adding && (
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Nova Despesa</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-500">Mês</label>
-              <select value={form.month} onChange={e => setForm(f => ({...f, month: Number(e.target.value)}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
-                {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Categoria</label>
-              <select value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
-                {EXPENSE_CATS.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Valor (€)</label>
-              <input type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">Notas</label>
-              <input type="text" placeholder="Opcional" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))}
-                className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleAdd} className="bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-amber-600">Guardar</button>
-            <button onClick={() => setAdding(false)} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
-          </div>
+          <ExpenseForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" />
         </div>
       )}
 
@@ -466,17 +490,24 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, hous
             <div className="space-y-3 md:hidden">
               {hExpenses.sort((a,b) => a.month - b.month).map(e => (
                 <div key={e.id} className="bg-white rounded-xl p-4 shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <p className="text-sm text-gray-600">{MONTHS[e.month]}</p>
-                      <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{e.category}</span>
-                      {e.notes && <p className="text-xs text-gray-400">{e.notes}</p>}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-bold text-amber-600">{fmt(e.amount)}</span>
-                      <button onClick={() => delExpense(e.id)} className="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
-                    </div>
-                  </div>
+                  {editId === e.id
+                    ? <div className="space-y-3">
+                        <p className="font-semibold text-gray-700 text-sm">Editar despesa</p>
+                        <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" />
+                      </div>
+                    : <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <p className="text-sm text-gray-600">{MONTHS[e.month]}</p>
+                          <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{e.category}</span>
+                          {e.notes && <p className="text-xs text-gray-400">{e.notes}</p>}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-amber-600">{fmt(e.amount)}</span>
+                          <button onClick={() => startEdit(e)} className="text-indigo-400 hover:text-indigo-600 text-lg leading-none">✎</button>
+                          <button onClick={() => delExpense(e.id)} className="text-red-400 hover:text-red-600 text-lg leading-none">✕</button>
+                        </div>
+                      </div>
+                  }
                 </div>
               ))}
               <div className="bg-amber-50 rounded-xl p-4 flex justify-between font-semibold">
@@ -499,15 +530,24 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, hous
                 </thead>
                 <tbody className="divide-y">
                   {hExpenses.sort((a,b) => a.month - b.month).map(e => (
-                    <tr key={e.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{MONTHS[e.month]}</td>
-                      <td className="px-4 py-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{e.category}</span></td>
-                      <td className="px-4 py-3 text-right font-medium text-amber-600">{fmt(e.amount)}</td>
-                      <td className="px-4 py-3 text-gray-400">{e.notes}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => delExpense(e.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
-                      </td>
-                    </tr>
+                    editId === e.id
+                      ? <tr key={e.id} className="bg-amber-50">
+                          <td colSpan={5} className="px-4 py-3">
+                            <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" />
+                          </td>
+                        </tr>
+                      : <tr key={e.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">{MONTHS[e.month]}</td>
+                          <td className="px-4 py-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{e.category}</span></td>
+                          <td className="px-4 py-3 text-right font-medium text-amber-600">{fmt(e.amount)}</td>
+                          <td className="px-4 py-3 text-gray-400">{e.notes}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => startEdit(e)} className="text-indigo-400 hover:text-indigo-600 text-xs">✎</button>
+                              <button onClick={() => delExpense(e.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            </div>
+                          </td>
+                        </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-gray-50">
