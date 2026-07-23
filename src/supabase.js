@@ -19,3 +19,16 @@ export const storage = {
     await supabase.from('kv').upsert({ key, value })
   }
 }
+
+export async function uploadFile(file, path) {
+  const { data, error } = await supabase.storage
+    .from('attachments')
+    .upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path)
+  return urlData.publicUrl
+}
+
+export async function deleteFile(path) {
+  await supabase.storage.from('attachments').remove([path])
+}

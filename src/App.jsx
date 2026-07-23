@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { storage } from './supabase'
+import { storage, uploadFile, deleteFile } from './supabase'
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
 const K_INCOME   = 'income'
@@ -327,7 +327,7 @@ function KpiCard({ label, value, color }) {
 }
 
 // ── Income form ───────────────────────────────────────────────────────────────
-function IncomeForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) {
+function IncomeForm({ data, setData, onSave, onCancel, saveLabel, saveClass, uploading }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
@@ -354,8 +354,18 @@ function IncomeForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) {
         <input type="text" placeholder="Opcional" value={data.notes} onChange={e => setData(f => ({...f, notes: e.target.value}))}
           className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
       </div>
+      <div className="col-span-2">
+        <label className="text-xs text-gray-500">Anexo</label>
+        <input type="file" onChange={e => setData(f => ({...f, file: e.target.files[0] || null}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5 bg-white" />
+        {data.attachmentName && !data.file && (
+          <p className="text-xs text-indigo-600 mt-1">📎 {data.attachmentName} (já anexado)</p>
+        )}
+      </div>
       <div className="col-span-2 flex gap-2">
-        <button onClick={onSave} className={`${saveClass} text-white px-4 py-1.5 rounded-lg text-sm`}>{saveLabel}</button>
+        <button onClick={onSave} disabled={uploading} className={`${saveClass} text-white px-4 py-1.5 rounded-lg text-sm disabled:opacity-60`}>
+          {uploading ? 'A carregar…' : saveLabel}
+        </button>
         <button onClick={onCancel} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
       </div>
     </div>
@@ -364,30 +374,48 @@ function IncomeForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) {
 
 // ── Income ────────────────────────────────────────────────────────────────────
 function Income({ house, year, setYear, income, addIncome, delIncome, editIncome, houses }) {
-  const [form, setForm]     = useState({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '' })
-  const [adding, setAdding] = useState(false)
-  const [editId, setEditId] = useState(null)
+  const [form, setForm]         = useState({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '', file: null })
+  const [adding, setAdding]     = useState(false)
+  const [editId, setEditId]     = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const [uploading, setUploading] = useState(false)
 
   const hIncome = income.filter(i => i.house === house && Number(i.year) === year)
   const total   = hIncome.reduce((s, i) => s + parseAmount(i.amount), 0)
 
   const handleAdd = async () => {
     if (!form.amount) return
-    await addIncome({ ...form, house, year })
-    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '' })
+    setUploading(true)
+    let attachmentUrl = null, attachmentName = null
+    if (form.file) {
+      const path = `income/${genId()}_${form.file.name}`
+      attachmentUrl = await uploadFile(form.file, path)
+      attachmentName = form.file.name
+    }
+    await addIncome({ ...form, house, year, attachmentUrl, attachmentName, file: undefined })
+    setForm({ month: currentMonth(), category: INCOME_CATS[0], amount: '', notes: '', file: null })
     setAdding(false)
+    setUploading(false)
   }
 
   const startEdit = i => {
     setEditId(i.id)
-    setEditForm({ month: i.month, category: i.category, amount: String(i.amount), notes: i.notes || '' })
+    setEditForm({ month: i.month, category: i.category, amount: String(i.amount), notes: i.notes || '', attachmentUrl: i.attachmentUrl || null, attachmentName: i.attachmentName || null, file: null })
   }
 
   const handleEdit = async () => {
     if (!editForm.amount) return
-    await editIncome(editId, editForm)
+    setUploading(true)
+    let attachmentUrl = editForm.attachmentUrl
+    let attachmentName = editForm.attachmentName
+    if (editForm.file) {
+      const path = `income/${genId()}_${editForm.file.name}`
+      attachmentUrl = await uploadFile(editForm.file, path)
+      attachmentName = editForm.file.name
+    }
+    await editIncome(editId, { ...editForm, attachmentUrl, attachmentName, file: undefined })
     setEditId(null); setEditForm(null)
+    setUploading(false)
   }
 
   const cancelEdit = () => { setEditId(null); setEditForm(null) }
@@ -412,7 +440,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
       {adding && (
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Novo Rendimento</h3>
-          <IncomeForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" />
+          <IncomeForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" uploading={uploading} />
         </div>
       )}
 
@@ -426,13 +454,14 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
                   {editId === i.id
                     ? <div className="space-y-3">
                         <p className="font-semibold text-gray-700 text-sm">Editar rendimento</p>
-                        <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" />
+                        <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" uploading={uploading} />
                       </div>
                     : <div className="flex justify-between items-start">
                         <div className="space-y-1">
                           <p className="text-sm text-gray-600">{MONTHS[i.month]}</p>
                           <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span>
                           {i.notes && <p className="text-xs text-gray-400">{i.notes}</p>}
+                          {i.attachmentUrl && <a href={i.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline">📎 {i.attachmentName || 'Anexo'}</a>}
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-bold text-green-600">{fmt(i.amount)}</span>
@@ -458,6 +487,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
                     <th className="px-4 py-3 text-left">Categoria</th>
                     <th className="px-4 py-3 text-right">Valor</th>
                     <th className="px-4 py-3 text-left">Notas</th>
+                    <th className="px-4 py-3 text-left">Anexo</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -465,8 +495,8 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
                   {hIncome.sort((a,b) => a.month - b.month).map(i => (
                     editId === i.id
                       ? <tr key={i.id} className="bg-indigo-50">
-                          <td colSpan={5} className="px-4 py-3">
-                            <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" />
+                          <td colSpan={6} className="px-4 py-3">
+                            <IncomeForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-indigo-600 hover:bg-indigo-700" uploading={uploading} />
                           </td>
                         </tr>
                       : <tr key={i.id} className="hover:bg-gray-50">
@@ -474,6 +504,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
                           <td className="px-4 py-3"><span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{i.category}</span></td>
                           <td className="px-4 py-3 text-right font-medium text-green-600">{fmt(i.amount)}</td>
                           <td className="px-4 py-3 text-gray-400">{i.notes}</td>
+                          <td className="px-4 py-3">{i.attachmentUrl && <a href={i.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline text-xs">📎 {i.attachmentName || 'Anexo'}</a>}</td>
                           <td className="px-4 py-3">
                             <div className="flex gap-2 justify-end">
                               <button onClick={() => startEdit(i)} className="text-indigo-400 hover:text-indigo-600 text-xs">✎</button>
@@ -487,7 +518,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
                   <tr>
                     <td colSpan={2} className="px-4 py-3 font-semibold text-gray-600">Total</td>
                     <td className="px-4 py-3 text-right font-bold text-green-600">{fmt(total)}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               </table>
@@ -499,7 +530,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, editIncome
 }
 
 // ── Expense form (shared between add and edit) ────────────────────────────────
-function ExpenseForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) {
+function ExpenseForm({ data, setData, onSave, onCancel, saveLabel, saveClass, uploading }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
@@ -526,8 +557,18 @@ function ExpenseForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) 
         <input type="text" placeholder="Opcional" value={data.notes} onChange={e => setData(f => ({...f, notes: e.target.value}))}
           className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
       </div>
+      <div className="col-span-2">
+        <label className="text-xs text-gray-500">Anexo</label>
+        <input type="file" onChange={e => setData(f => ({...f, file: e.target.files[0] || null}))}
+          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5 bg-white" />
+        {data.attachmentName && !data.file && (
+          <p className="text-xs text-indigo-600 mt-1">📎 {data.attachmentName} (já anexado)</p>
+        )}
+      </div>
       <div className="col-span-2 flex gap-2">
-        <button onClick={onSave} className={`${saveClass} text-white px-4 py-1.5 rounded-lg text-sm`}>{saveLabel}</button>
+        <button onClick={onSave} disabled={uploading} className={`${saveClass} text-white px-4 py-1.5 rounded-lg text-sm disabled:opacity-60`}>
+          {uploading ? 'A carregar…' : saveLabel}
+        </button>
         <button onClick={onCancel} className="text-gray-500 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-100">Cancelar</button>
       </div>
     </div>
@@ -536,31 +577,49 @@ function ExpenseForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) 
 
 // ── Expenses ──────────────────────────────────────────────────────────────────
 function Expenses({ house, year, setYear, expenses, addExpense, delExpense, editExpense, houses }) {
-  const [form, setForm]     = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
-  const [adding, setAdding] = useState(false)
-  const [editId, setEditId] = useState(null)
+  const [form, setForm]         = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '', file: null })
+  const [adding, setAdding]     = useState(false)
+  const [editId, setEditId]     = useState(null)
   const [editForm, setEditForm] = useState(null)
+  const [uploading, setUploading] = useState(false)
 
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
   const total     = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
 
   const handleAdd = async () => {
     if (!form.amount) return
-    await addExpense({ ...form, house, year })
-    setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
+    setUploading(true)
+    let attachmentUrl = null, attachmentName = null
+    if (form.file) {
+      const path = `expenses/${genId()}_${form.file.name}`
+      attachmentUrl = await uploadFile(form.file, path)
+      attachmentName = form.file.name
+    }
+    await addExpense({ ...form, house, year, attachmentUrl, attachmentName, file: undefined })
+    setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '', file: null })
     setAdding(false)
+    setUploading(false)
   }
 
   const startEdit = e => {
     setEditId(e.id)
-    setEditForm({ month: e.month, category: e.category, amount: String(e.amount), notes: e.notes || '' })
+    setEditForm({ month: e.month, category: e.category, amount: String(e.amount), notes: e.notes || '', attachmentUrl: e.attachmentUrl || null, attachmentName: e.attachmentName || null, file: null })
   }
 
   const handleEdit = async () => {
     if (!editForm.amount) return
-    await editExpense(editId, editForm)
+    setUploading(true)
+    let attachmentUrl = editForm.attachmentUrl
+    let attachmentName = editForm.attachmentName
+    if (editForm.file) {
+      const path = `expenses/${genId()}_${editForm.file.name}`
+      attachmentUrl = await uploadFile(editForm.file, path)
+      attachmentName = editForm.file.name
+    }
+    await editExpense(editId, { ...editForm, attachmentUrl, attachmentName, file: undefined })
     setEditId(null)
     setEditForm(null)
+    setUploading(false)
   }
 
   const cancelEdit = () => { setEditId(null); setEditForm(null) }
@@ -585,7 +644,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
       {adding && (
         <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
           <h3 className="font-semibold text-gray-700">Nova Despesa</h3>
-          <ExpenseForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" />
+          <ExpenseForm data={form} setData={setForm} onSave={handleAdd} onCancel={() => setAdding(false)} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" uploading={uploading} />
         </div>
       )}
 
@@ -599,13 +658,14 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
                   {editId === e.id
                     ? <div className="space-y-3">
                         <p className="font-semibold text-gray-700 text-sm">Editar despesa</p>
-                        <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" />
+                        <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" uploading={uploading} />
                       </div>
                     : <div className="flex justify-between items-start">
                         <div className="space-y-1">
                           <p className="text-sm text-gray-600">{MONTHS[e.month]}</p>
                           <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{e.category}</span>
                           {e.notes && <p className="text-xs text-gray-400">{e.notes}</p>}
+                          {e.attachmentUrl && <a href={e.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-500 hover:underline">📎 {e.attachmentName || 'Anexo'}</a>}
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-bold text-amber-600">{fmt(e.amount)}</span>
@@ -631,6 +691,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
                     <th className="px-4 py-3 text-left">Categoria</th>
                     <th className="px-4 py-3 text-right">Valor</th>
                     <th className="px-4 py-3 text-left">Notas</th>
+                    <th className="px-4 py-3 text-left">Anexo</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -638,8 +699,8 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
                   {hExpenses.sort((a,b) => a.month - b.month).map(e => (
                     editId === e.id
                       ? <tr key={e.id} className="bg-amber-50">
-                          <td colSpan={5} className="px-4 py-3">
-                            <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" />
+                          <td colSpan={6} className="px-4 py-3">
+                            <ExpenseForm data={editForm} setData={setEditForm} onSave={handleEdit} onCancel={cancelEdit} saveLabel="Guardar" saveClass="bg-amber-500 hover:bg-amber-600" uploading={uploading} />
                           </td>
                         </tr>
                       : <tr key={e.id} className="hover:bg-gray-50">
@@ -647,6 +708,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
                           <td className="px-4 py-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{e.category}</span></td>
                           <td className="px-4 py-3 text-right font-medium text-amber-600">{fmt(e.amount)}</td>
                           <td className="px-4 py-3 text-gray-400">{e.notes}</td>
+                          <td className="px-4 py-3">{e.attachmentUrl && <a href={e.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline text-xs">📎 {e.attachmentName || 'Anexo'}</a>}</td>
                           <td className="px-4 py-3">
                             <div className="flex gap-2 justify-end">
                               <button onClick={() => startEdit(e)} className="text-indigo-400 hover:text-indigo-600 text-xs">✎</button>
@@ -660,7 +722,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
                   <tr>
                     <td colSpan={2} className="px-4 py-3 font-semibold text-gray-600">Total</td>
                     <td className="px-4 py-3 text-right font-bold text-amber-600">{fmt(total)}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               </table>
