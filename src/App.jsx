@@ -395,38 +395,9 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
   )
 }
 
-// ── Expenses ──────────────────────────────────────────────────────────────────
-function Expenses({ house, year, setYear, expenses, addExpense, delExpense, editExpense, houses }) {
-  const [form, setForm]     = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
-  const [adding, setAdding] = useState(false)
-  const [editId, setEditId] = useState(null)
-  const [editForm, setEditForm] = useState(null)
-
-  const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
-  const total     = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
-
-  const handleAdd = async () => {
-    if (!form.amount) return
-    await addExpense({ ...form, house, year })
-    setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
-    setAdding(false)
-  }
-
-  const startEdit = e => {
-    setEditId(e.id)
-    setEditForm({ month: e.month, category: e.category, amount: String(e.amount), notes: e.notes || '' })
-  }
-
-  const handleEdit = async () => {
-    if (!editForm.amount) return
-    await editExpense(editId, editForm)
-    setEditId(null)
-    setEditForm(null)
-  }
-
-  const cancelEdit = () => { setEditId(null); setEditForm(null) }
-
-  const ExpenseForm = ({ data, setData, onSave, onCancel, saveLabel, saveClass }) => (
+// ── Expense form (shared between add and edit) ────────────────────────────────
+function ExpenseForm({ data, setData, onSave, onCancel, saveLabel, saveClass }) {
+  return (
     <div className="grid grid-cols-2 gap-3">
       <div>
         <label className="text-xs text-gray-500">Mês</label>
@@ -458,6 +429,38 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
       </div>
     </div>
   )
+}
+
+// ── Expenses ──────────────────────────────────────────────────────────────────
+function Expenses({ house, year, setYear, expenses, addExpense, delExpense, editExpense, houses }) {
+  const [form, setForm]     = useState({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
+  const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState(null)
+
+  const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
+  const total     = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
+
+  const handleAdd = async () => {
+    if (!form.amount) return
+    await addExpense({ ...form, house, year })
+    setForm({ month: currentMonth(), category: EXPENSE_CATS[0], amount: '', notes: '' })
+    setAdding(false)
+  }
+
+  const startEdit = e => {
+    setEditId(e.id)
+    setEditForm({ month: e.month, category: e.category, amount: String(e.amount), notes: e.notes || '' })
+  }
+
+  const handleEdit = async () => {
+    if (!editForm.amount) return
+    await editExpense(editId, editForm)
+    setEditId(null)
+    setEditForm(null)
+  }
+
+  const cancelEdit = () => { setEditId(null); setEditForm(null) }
 
   return (
     <div className="space-y-4">
