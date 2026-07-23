@@ -180,6 +180,8 @@ function YearSelector({ year, setYear }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ house, year, setYear, income, expenses, houses }) {
+  const [openCat, setOpenCat] = useState(null)
+
   const hIncome   = income.filter(i   => i.house === house && Number(i.year) === year)
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
 
@@ -189,7 +191,8 @@ function Dashboard({ house, year, setYear, income, expenses, houses }) {
 
   const expByCat = EXPENSE_CATS.map(cat => ({
     name: cat,
-    value: hExpenses.filter(e => e.category === cat).reduce((s, e) => s + parseAmount(e.amount), 0)
+    value: hExpenses.filter(e => e.category === cat).reduce((s, e) => s + parseAmount(e.amount), 0),
+    items: hExpenses.filter(e => e.category === cat).sort((a, b) => a.month - b.month)
   })).filter(d => d.value > 0)
 
   return (
@@ -219,25 +222,45 @@ function Dashboard({ house, year, setYear, income, expenses, houses }) {
       </div>
 
       {/* Despesas por categoria */}
-      <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
-        <h3 className="font-semibold text-gray-700">Despesas por Categoria {year}</h3>
+      <div className="bg-white rounded-xl p-5 shadow-sm space-y-2">
+        <h3 className="font-semibold text-gray-700 mb-1">Despesas por Categoria {year}</h3>
         {expByCat.length === 0
           ? <p className="text-gray-400 text-sm text-center py-4">Sem despesas registadas</p>
-          : <div className="space-y-2">
+          : <>
               {expByCat.map((cat, i) => (
-                <div key={cat.name} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                    <span className="text-sm text-gray-700">{cat.name}</span>
-                  </div>
-                  <span className="font-medium text-amber-600">{fmt(cat.value)}</span>
+                <div key={cat.name} className="border-b last:border-0">
+                  <button
+                    onClick={() => setOpenCat(openCat === cat.name ? null : cat.name)}
+                    className="w-full flex items-center justify-between py-2.5 text-left hover:bg-gray-50 rounded-lg px-1 transition">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                      <span className="text-sm text-gray-700">{cat.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-amber-600">{fmt(cat.value)}</span>
+                      <span className="text-gray-400 text-xs">{openCat === cat.name ? '▲' : '▼'}</span>
+                    </div>
+                  </button>
+                  {openCat === cat.name && (
+                    <div className="mb-2 ml-4 space-y-1">
+                      {cat.items.map(e => (
+                        <div key={e.id} className="flex justify-between items-center py-1.5 px-2 bg-gray-50 rounded-lg text-sm">
+                          <div>
+                            <span className="text-gray-500">{MONTHS[e.month]}</span>
+                            {e.notes && <span className="text-gray-400 ml-2 text-xs">— {e.notes}</span>}
+                          </div>
+                          <span className="font-medium text-amber-600">{fmt(e.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
-              <div className="flex items-center justify-between pt-2 font-semibold">
+              <div className="flex items-center justify-between pt-3 font-semibold">
                 <span className="text-gray-600">Total</span>
                 <span className="text-amber-700">{fmt(totalExpenses)}</span>
               </div>
-            </div>
+            </>
         }
       </div>
     </div>
