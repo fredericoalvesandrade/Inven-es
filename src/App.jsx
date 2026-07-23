@@ -25,8 +25,12 @@ function genId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
+function parseAmount(val) {
+  return parseFloat(String(val).replace(',', '.')) || 0
+}
+
 function fmt(n) {
-  return Number(n || 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
+  return parseAmount(n).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -171,13 +175,13 @@ function Dashboard({ house, year, setYear, income, expenses, houses }) {
   const hIncome   = income.filter(i   => i.house === house && Number(i.year) === year)
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
 
-  const totalIncome   = hIncome.reduce((s, i) => s + Number(i.amount), 0)
-  const totalExpenses = hExpenses.reduce((s, e) => s + Number(e.amount), 0)
+  const totalIncome   = hIncome.reduce((s, i) => s + parseAmount(i.amount), 0)
+  const totalExpenses = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
   const profit        = totalIncome - totalExpenses
 
   const expByCat = EXPENSE_CATS.map(cat => ({
     name: cat,
-    value: hExpenses.filter(e => e.category === cat).reduce((s, e) => s + Number(e.amount), 0)
+    value: hExpenses.filter(e => e.category === cat).reduce((s, e) => s + parseAmount(e.amount), 0)
   })).filter(d => d.value > 0)
 
   return (
@@ -250,7 +254,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
   const [adding, setAdding] = useState(false)
 
   const hIncome = income.filter(i => i.house === house && Number(i.year) === year)
-  const total   = hIncome.reduce((s, i) => s + Number(i.amount), 0)
+  const total   = hIncome.reduce((s, i) => s + parseAmount(i.amount), 0)
 
   const handleAdd = async () => {
     if (!form.amount) return
@@ -299,7 +303,7 @@ function Income({ house, year, setYear, income, addIncome, delIncome, houses }) 
             </div>
             <div>
               <label className="text-xs text-gray-500">Valor (€)</label>
-              <input type="number" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+              <input type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
                 className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
             </div>
             <div>
@@ -393,7 +397,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, hous
   const [adding, setAdding] = useState(false)
 
   const hExpenses = expenses.filter(e => e.house === house && Number(e.year) === year)
-  const total     = hExpenses.reduce((s, e) => s + Number(e.amount), 0)
+  const total     = hExpenses.reduce((s, e) => s + parseAmount(e.amount), 0)
 
   const handleAdd = async () => {
     if (!form.amount) return
@@ -439,7 +443,7 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, hous
             </div>
             <div>
               <label className="text-xs text-gray-500">Valor (€)</label>
-              <input type="number" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+              <input type="text" inputMode="decimal" placeholder="0" value={form.amount} onChange={e => setForm(f => ({...f, amount: e.target.value}))}
                 className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
             </div>
             <div>
