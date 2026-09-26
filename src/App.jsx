@@ -65,6 +65,21 @@ export default function App() {
     load()
   }, [])
 
+  // ── Keep Supabase alive (ping every 3 days) ────────────────────────────────
+  useEffect(() => {
+    const PING_KEY = 'supabase_last_ping'
+    const THREE_DAYS = 3 * 24 * 60 * 60 * 1000
+    async function ping() {
+      try {
+        const last = localStorage.getItem(PING_KEY)
+        if (last && Date.now() - Number(last) < THREE_DAYS) return
+        await storage.set('_ping', String(Date.now()))
+        localStorage.setItem(PING_KEY, String(Date.now()))
+      } catch (_) {}
+    }
+    ping()
+  }, [])
+
   const houses = settings.houses || DEFAULT_HOUSES
 
   // ── Persist helpers ────────────────────────────────────────────────────────
