@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { storage, uploadFile, deleteFile } from './supabase'
+import { storage, uploadFile, deleteFile } from './firebase'
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
 const K_INCOME   = 'income'
