@@ -813,28 +813,31 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
   )
 }
 
-// ── Settle debts algorithm (minimum transactions) ─────────────────────────────
+// ── Equalize expenses algorithm (minimum transactions) ────────────────────────
 function settleDebts(saldos) {
-  const balances = saldos.map(u => ({
+  if (saldos.length < 2) return []
+  const totals = saldos.map(u => ({
     name: u.name,
-    bal: Math.round(u.entries.reduce((s, e) => s + parseAmount(e.amount), 0) * 100) / 100
-  })).filter(u => Math.abs(u.bal) > 0.005)
-
-  const creditors = balances.filter(u => u.bal > 0).map(u => ({...u})).sort((a,b) => b.bal - a.bal)
-  const debtors   = balances.filter(u => u.bal < 0).map(u => ({...u})).sort((a,b) => a.bal - b.bal)
+    spent: Math.round(u.entries.reduce((s, e) => s + parseAmount(e.amount), 0) * 100) / 100
+  }))
+  const avg = Math.round(totals.reduce((s, u) => s + u.spent, 0) / totals.length * 100) / 100
+  // positive diff = spent more than avg (should receive), negative = spent less (should pay)
+  const diffs = totals.map(u => ({ name: u.name, diff: Math.round((u.spent - avg) * 100) / 100 }))
+  const receivers = diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
+  const payers    = diffs.filter(u => u.diff < -0.005).map(u => ({...u})).sort((a,b) => a.diff - b.diff)
 
   const txs = []
-  let ci = 0, di = 0
-  while (ci < creditors.length && di < debtors.length) {
-    const c = creditors[ci], d = debtors[di]
-    const amount = Math.min(c.bal, -d.bal)
-    txs.push({ from: d.name, to: c.name, amount: Math.round(amount * 100) / 100 })
-    c.bal -= amount
-    d.bal += amount
-    if (Math.abs(c.bal) < 0.005) ci++
-    if (Math.abs(d.bal) < 0.005) di++
+  let ri = 0, pi = 0
+  while (ri < receivers.length && pi < payers.length) {
+    const r = receivers[ri], p = payers[pi]
+    const amount = Math.min(r.diff, -p.diff)
+    txs.push({ from: p.name, to: r.name, amount: Math.round(amount * 100) / 100 })
+    r.diff -= amount
+    p.diff += amount
+    if (r.diff < 0.005) ri++
+    if (p.diff > -0.005) pi++
   }
-  return txs
+  return { txs, avg }
 }
 
 // ── Saldos ────────────────────────────────────────────────────────────────────
@@ -844,8 +847,8 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
   const [editingName, setEditingName] = useState(null)
   const [tempName, setTempName] = useState('')
 
-  const txs = settleDebts(saldos)
-  const allZero = saldos.length > 0 && txs.length === 0
+  const { txs = [], avg = 0 } = saldos.length >= 2 ? settleDebts(saldos) : {}
+  const allZero = saldos.length >= 2 && txs.length === 0
 
   return (
     <div className="space-y-4">
@@ -873,19 +876,27 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
       {/* Liquidação */}
       {saldos.length >= 2 && (
         <div className={`rounded-xl p-4 shadow-sm space-y-2 ${allZero ? 'bg-green-50' : 'bg-amber-50'}`}>
-          <h3 className="font-semibold text-gray-700 text-sm">
-            {allZero ? '✅ Contas equilibradas' : `⚖️ Para acertar contas (${txs.length} movimento${txs.length !== 1 ? 's' : ''})`}
-          </h3>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-semibold text-gray-700 text-sm">
+              {allZero ? '✅ Contas equilibradas' : `⚖️ Para acertar contas`}
+            </h3>
+            <span className="text-xs text-gray-500">Média: <span className="font-semibold text-gray-700">{fmt(avg)}</span></span>
+          </div>
           {allZero
-            ? <p className="text-green-700 text-sm">Todos os saldos estão a zero. Não há nada a acertar.</p>
-            : txs.map((tx, i) => (
-                <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2.5">
-                  <span className="font-medium text-red-600 text-sm">{tx.from}</span>
-                  <span className="text-gray-400 text-xs">→ paga →</span>
-                  <span className="font-medium text-green-700 text-sm">{tx.to}</span>
-                  <span className="ml-auto font-bold text-gray-800 text-sm">{fmt(tx.amount)}</span>
-                </div>
-              ))
+            ? <p className="text-green-700 text-sm">Cada um gastou exatamente {fmt(avg)}. Não há nada a transferir.</p>
+            : <>
+                <p className="text-xs text-gray-500 pb-1">{txs.length} transferência{txs.length !== 1 ? 's' : ''} necessária{txs.length !== 1 ? 's' : ''}:</p>
+                {txs.map((tx, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-white rounded-xl px-3 py-3">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-red-600">{tx.from}</span>
+                      <span className="text-gray-400 text-xs mx-1.5">→ transfere para →</span>
+                      <span className="font-semibold text-green-700">{tx.to}</span>
+                    </div>
+                    <span className="font-bold text-gray-800 shrink-0">{fmt(tx.amount)}</span>
+                  </div>
+                ))}
+              </>
           }
         </div>
       )}
