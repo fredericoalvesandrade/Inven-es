@@ -950,11 +950,11 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
                 <div className="flex gap-2">
                   <button onClick={() => setForm(f => ({...f, sign: 1}))}
                     className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
-                    + Positivo
+                    + Recebeu
                   </button>
                   <button onClick={() => setForm(f => ({...f, sign: -1}))}
                     className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === -1 ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-300'}`}>
-                    − Negativo
+                    − Gastou
                   </button>
                 </div>
                 <div className="flex gap-2 items-center">
