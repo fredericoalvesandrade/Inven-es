@@ -821,21 +821,21 @@ function settleDebts(saldos) {
     spent: Math.round(u.entries.reduce((s, e) => s + parseAmount(e.amount), 0) * 100) / 100
   }))
   const avg = Math.round(totals.reduce((s, u) => s + u.spent, 0) / totals.length * 100) / 100
-  // positive diff = spent more than avg (should receive), negative = spent less (should pay)
+  // diff = spent - avg; since "gastou" is negative, more negative = spent more = should receive
   const diffs = totals.map(u => ({ name: u.name, diff: Math.round((u.spent - avg) * 100) / 100 }))
-  const receivers = diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
-  const payers    = diffs.filter(u => u.diff < -0.005).map(u => ({...u})).sort((a,b) => a.diff - b.diff)
+  const receivers = diffs.filter(u => u.diff < -0.005).map(u => ({...u, diff: -u.diff})).sort((a,b) => b.diff - a.diff)
+  const payers    = diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
 
   const txs = []
   let ri = 0, pi = 0
   while (ri < receivers.length && pi < payers.length) {
     const r = receivers[ri], p = payers[pi]
-    const amount = Math.min(r.diff, -p.diff)
+    const amount = Math.min(r.diff, p.diff)
     txs.push({ from: p.name, to: r.name, amount: Math.round(amount * 100) / 100 })
     r.diff -= amount
-    p.diff += amount
+    p.diff -= amount
     if (r.diff < 0.005) ri++
-    if (p.diff > -0.005) pi++
+    if (p.diff < 0.005) pi++
   }
   return { txs, avg }
 }
