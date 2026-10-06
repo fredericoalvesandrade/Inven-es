@@ -876,32 +876,37 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
     if (!form.amount) return
     const signed = String(form.sign * Math.abs(parseAmount(form.amount)))
     addEntry({ amount: signed, notes: form.notes, date: new Date().toISOString().slice(0,10) })
-    setForm({ amount: '', notes: '', sign: 1 }); setAdding(false)
+    setForm({ amount: '', notes: '', sign: -1 }); setAdding(false)
   }
 
-  const startEdit = e => { setEditId(e.id); setEditForm({ amount: String(e.amount), notes: e.notes || '' }) }
-  const handleEdit = () => { if (!editForm.amount) return; editEntry(editId, editForm); setEditId(null); setEditForm(null) }
+  const startEdit = e => { setEditId(e.id); setEditForm({ amount: String(Math.abs(parseAmount(e.amount))), notes: e.notes || '', sign: parseAmount(e.amount) >= 0 ? 1 : -1 }) }
+  const handleEdit = () => {
+    if (!editForm.amount) return
+    const signed = String(editForm.sign * Math.abs(parseAmount(editForm.amount)))
+    editEntry(editId, { ...editForm, amount: signed })
+    setEditId(null); setEditForm(null)
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Header do utilizador */}
-      <div className="flex items-center justify-between px-4 py-3 border-b">
+      <div className="flex items-center justify-between px-4 py-4 border-b">
         {editingName
           ? <div className="flex gap-2 flex-1 mr-2">
               <input value={tempName} onChange={e => setTempName(e.target.value)} autoFocus
                 onKeyDown={e => { if (e.key === 'Enter') onSaveRename(); if (e.key === 'Escape') onCancelRename() }}
-                className="flex-1 border rounded-lg px-2 py-1 text-sm" />
-              <button onClick={onSaveRename} className="text-indigo-600 text-sm font-medium">✓</button>
-              <button onClick={onCancelRename} className="text-gray-400 text-sm">✕</button>
+                className="flex-1 border rounded-lg px-3 py-2 text-base" />
+              <button onClick={onSaveRename} className="text-indigo-600 text-xl font-medium px-2">✓</button>
+              <button onClick={onCancelRename} className="text-gray-400 text-xl px-2">✕</button>
             </div>
-          : <button onClick={onToggle} className="flex-1 text-left font-semibold text-gray-800 text-sm">{user.name}</button>
+          : <button onClick={onToggle} className="flex-1 text-left font-semibold text-gray-800">{user.name}</button>
         }
         <div className="flex items-center gap-3">
-          <span className={`font-bold text-sm ${total >= 0 ? 'text-green-600' : 'text-red-500'}`}>{fmt(total)}</span>
+          <span className={`font-bold ${total >= 0 ? 'text-green-600' : 'text-red-500'}`}>{fmt(total)}</span>
           {!editingName && <>
-            <button onClick={onStartRename} className="text-gray-400 hover:text-indigo-500 text-sm">✎</button>
-            <button onClick={onDelUser} className="text-gray-400 hover:text-red-500 text-sm">✕</button>
-            <button onClick={onToggle} className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</button>
+            <button onClick={onStartRename} className="text-gray-400 hover:text-indigo-500 text-xl p-1">✎</button>
+            <button onClick={onDelUser} className="text-gray-400 hover:text-red-500 text-xl p-1">✕</button>
+            <button onClick={onToggle} className="text-gray-500 text-sm p-1">{isOpen ? '▲' : '▼'}</button>
           </>}
         </div>
       </div>
@@ -910,32 +915,44 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
         <div className="p-4 space-y-3">
           {/* Lançamentos */}
           {user.entries.length === 0 && !adding
-            ? <p className="text-gray-400 text-sm text-center py-2">Sem lançamentos</p>
+            ? <p className="text-gray-400 text-sm text-center py-4">Sem lançamentos</p>
             : <div className="space-y-2">
                 {user.entries.map(e => (
                   <div key={e.id}>
                     {editId === e.id
-                      ? <div className="flex gap-2 items-center">
+                      ? <div className="space-y-2 bg-gray-50 rounded-xl p-3">
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditForm(f => ({...f, sign: -1}))}
+                              className={`flex-1 py-3 rounded-xl font-semibold border-2 transition ${editForm.sign === -1 ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-300'}`}>
+                              − Gastou
+                            </button>
+                            <button onClick={() => setEditForm(f => ({...f, sign: 1}))}
+                              className={`flex-1 py-3 rounded-xl font-semibold border-2 transition ${editForm.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
+                              + Recebeu
+                            </button>
+                          </div>
                           <input type="text" inputMode="decimal" value={editForm.amount}
                             onChange={ev => setEditForm(f => ({...f, amount: ev.target.value}))}
-                            placeholder="Valor" className="w-24 border rounded-lg px-2 py-1 text-sm" />
+                            placeholder="Valor" className="w-full border rounded-xl px-4 py-3 text-base bg-white" />
                           <input type="text" value={editForm.notes}
                             onChange={ev => setEditForm(f => ({...f, notes: ev.target.value}))}
-                            placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1 text-sm" />
-                          <button onClick={handleEdit} className="text-indigo-600 text-sm font-medium">✓</button>
-                          <button onClick={() => { setEditId(null); setEditForm(null) }} className="text-gray-400 text-sm">✕</button>
+                            placeholder="Notas (opcional)" className="w-full border rounded-xl px-4 py-3 text-base bg-white" />
+                          <div className="flex gap-2">
+                            <button onClick={handleEdit} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold">Guardar</button>
+                            <button onClick={() => { setEditId(null); setEditForm(null) }} className="flex-1 bg-white text-gray-500 py-3 rounded-xl font-medium border">Cancelar</button>
+                          </div>
                         </div>
-                      : <div className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-lg">
-                          <div className="text-sm">
-                            <span className="text-gray-400 text-xs mr-2">{e.date}</span>
-                            {e.notes && <span className="text-gray-600">{e.notes}</span>}
+                      : <div className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl">
+                          <div>
+                            <div className="text-xs text-gray-400 mb-0.5">{e.date}</div>
+                            {e.notes && <div className="text-sm text-gray-700">{e.notes}</div>}
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className={`font-semibold text-sm ${parseAmount(e.amount) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            <span className={`font-bold ${parseAmount(e.amount) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                               {parseAmount(e.amount) >= 0 ? '+' : ''}{fmt(e.amount)}
                             </span>
-                            <button onClick={() => startEdit(e)} className="text-indigo-400 hover:text-indigo-600 text-xs">✎</button>
-                            <button onClick={() => delEntry(e.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                            <button onClick={() => startEdit(e)} className="text-indigo-400 hover:text-indigo-600 text-xl p-1">✎</button>
+                            <button onClick={() => delEntry(e.id)} className="text-red-400 hover:text-red-600 text-xl p-1">✕</button>
                           </div>
                         </div>
                     }
@@ -946,31 +963,32 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
 
           {/* Formulário novo lançamento */}
           {adding
-            ? <div className="space-y-2 pt-1">
+            ? <div className="space-y-3 bg-indigo-50 rounded-xl p-4">
                 <div className="flex gap-2">
                   <button onClick={() => setForm(f => ({...f, sign: -1}))}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === -1 ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-300'}`}>
+                    className={`flex-1 py-3 rounded-xl font-semibold border-2 transition ${form.sign === -1 ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-300'}`}>
                     − Gastou
                   </button>
                   <button onClick={() => setForm(f => ({...f, sign: 1}))}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
+                    className={`flex-1 py-3 rounded-xl font-semibold border-2 transition ${form.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
                     + Recebeu
                   </button>
                 </div>
-                <div className="flex gap-2 items-center">
-                  <input type="text" inputMode="decimal" value={form.amount}
-                    onChange={e => setForm(f => ({...f, amount: e.target.value}))}
-                    placeholder="Valor" className="w-28 border rounded-lg px-2 py-1.5 text-sm" />
-                  <input type="text" value={form.notes}
-                    onChange={e => setForm(f => ({...f, notes: e.target.value}))}
-                    placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1.5 text-sm" />
-                  <button onClick={handleAdd} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm">✓</button>
-                  <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '', sign: -1 }) }} className="text-gray-400 px-2 py-1.5 text-sm">✕</button>
+                <input type="text" inputMode="decimal" value={form.amount}
+                  onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+                  placeholder="Valor (ex: 50)" className="w-full border rounded-xl px-4 py-3 text-base bg-white" />
+                <input type="text" value={form.notes}
+                  onChange={e => setForm(f => ({...f, notes: e.target.value}))}
+                  onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                  placeholder="Notas (opcional)" className="w-full border rounded-xl px-4 py-3 text-base bg-white" />
+                <div className="flex gap-2">
+                  <button onClick={handleAdd} className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-semibold text-base">Guardar</button>
+                  <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '', sign: -1 }) }} className="flex-1 bg-white text-gray-500 py-3 rounded-xl font-medium text-base border">Cancelar</button>
                 </div>
               </div>
             : <button onClick={() => setAdding(true)}
-                className="w-full text-sm text-indigo-600 hover:text-indigo-800 py-1.5 border border-dashed border-indigo-300 rounded-lg hover:bg-indigo-50 transition">
-                + Lançamento
+                className="w-full text-indigo-600 font-medium py-3 border-2 border-dashed border-indigo-300 rounded-xl hover:bg-indigo-50 transition">
+                + Novo Lançamento
               </button>
           }
         </div>
