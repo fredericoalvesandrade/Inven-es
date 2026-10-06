@@ -828,9 +828,10 @@ function settleDebts(saldos) {
 
   const txs = []
   if (isPositive) {
-    // House pays each person who received less than average
-    diffs.filter(u => u.diff < -0.005).forEach(u => {
-      txs.push({ to: u.name, amount: Math.round(-u.diff * 100) / 100 })
+    // House pays each person who received less than the top earner
+    const maxTotal = Math.max(...totals.map(u => u.total))
+    totals.filter(u => maxTotal - u.total > 0.005).forEach(u => {
+      txs.push({ to: u.name, amount: Math.round((maxTotal - u.total) * 100) / 100 })
     })
   } else {
     // User-to-user: those who spent less pay those who spent more
@@ -847,7 +848,8 @@ function settleDebts(saldos) {
       if (p.diff < 0.005) pi++
     }
   }
-  return { txs, avg, isPositive }
+  const target = isPositive ? Math.max(...totals.map(u => u.total)) : avg
+  return { txs, avg: target, isPositive }
 }
 
 // ── Saldos ────────────────────────────────────────────────────────────────────
