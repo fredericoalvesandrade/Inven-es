@@ -868,14 +868,15 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
 function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName, onStartRename, onSaveRename, onCancelRename, onDelUser, addEntry, delEntry, editEntry }) {
   const total = user.entries.reduce((s, e) => s + parseAmount(e.amount), 0)
   const [adding, setAdding]     = useState(false)
-  const [form, setForm]         = useState({ amount: '', notes: '' })
+  const [form, setForm]         = useState({ amount: '', notes: '', sign: 1 })
   const [editId, setEditId]     = useState(null)
   const [editForm, setEditForm] = useState(null)
 
   const handleAdd = () => {
     if (!form.amount) return
-    addEntry({ amount: form.amount, notes: form.notes, date: new Date().toISOString().slice(0,10) })
-    setForm({ amount: '', notes: '' }); setAdding(false)
+    const signed = String(form.sign * Math.abs(parseAmount(form.amount)))
+    addEntry({ amount: signed, notes: form.notes, date: new Date().toISOString().slice(0,10) })
+    setForm({ amount: '', notes: '', sign: 1 }); setAdding(false)
   }
 
   const startEdit = e => { setEditId(e.id); setEditForm({ amount: String(e.amount), notes: e.notes || '' }) }
@@ -945,15 +946,27 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
 
           {/* Formulário novo lançamento */}
           {adding
-            ? <div className="flex gap-2 items-center pt-1">
-                <input type="text" inputMode="decimal" value={form.amount}
-                  onChange={e => setForm(f => ({...f, amount: e.target.value}))}
-                  placeholder="Valor (+/-)" className="w-28 border rounded-lg px-2 py-1.5 text-sm" />
-                <input type="text" value={form.notes}
-                  onChange={e => setForm(f => ({...f, notes: e.target.value}))}
-                  placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1.5 text-sm" />
-                <button onClick={handleAdd} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm">✓</button>
-                <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '' }) }} className="text-gray-400 px-2 py-1.5 text-sm">✕</button>
+            ? <div className="space-y-2 pt-1">
+                <div className="flex gap-2">
+                  <button onClick={() => setForm(f => ({...f, sign: 1}))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
+                    + Positivo
+                  </button>
+                  <button onClick={() => setForm(f => ({...f, sign: -1}))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === -1 ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-300'}`}>
+                    − Negativo
+                  </button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input type="text" inputMode="decimal" value={form.amount}
+                    onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+                    placeholder="Valor" className="w-28 border rounded-lg px-2 py-1.5 text-sm" />
+                  <input type="text" value={form.notes}
+                    onChange={e => setForm(f => ({...f, notes: e.target.value}))}
+                    placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1.5 text-sm" />
+                  <button onClick={handleAdd} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm">✓</button>
+                  <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '', sign: 1 }) }} className="text-gray-400 px-2 py-1.5 text-sm">✕</button>
+                </div>
               </div>
             : <button onClick={() => setAdding(true)}
                 className="w-full text-sm text-indigo-600 hover:text-indigo-800 py-1.5 border border-dashed border-indigo-300 rounded-lg hover:bg-indigo-50 transition">
