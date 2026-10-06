@@ -813,31 +813,41 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
   )
 }
 
-// ── Equalize expenses algorithm (minimum transactions) ────────────────────────
+// ── Equalize algorithm (minimum transactions) ─────────────────────────────────
 function settleDebts(saldos) {
-  if (saldos.length < 2) return []
+  if (saldos.length < 2) return {}
   const totals = saldos.map(u => ({
     name: u.name,
-    spent: Math.round(u.entries.reduce((s, e) => s + parseAmount(e.amount), 0) * 100) / 100
+    total: Math.round(u.entries.reduce((s, e) => s + parseAmount(e.amount), 0) * 100) / 100
   }))
-  const avg = Math.round(totals.reduce((s, u) => s + u.spent, 0) / totals.length * 100) / 100
-  // diff = spent - avg; since "gastou" is negative, more negative = spent more = should receive
-  const diffs = totals.map(u => ({ name: u.name, diff: Math.round((u.spent - avg) * 100) / 100 }))
-  const receivers = diffs.filter(u => u.diff < -0.005).map(u => ({...u, diff: -u.diff})).sort((a,b) => b.diff - a.diff)
-  const payers    = diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
+  const sum = totals.reduce((s, u) => s + u.total, 0)
+  const avg = Math.round(sum / totals.length * 100) / 100
+  const isPositive = sum >= 0
 
-  const txs = []
-  let ri = 0, pi = 0
-  while (ri < receivers.length && pi < payers.length) {
-    const r = receivers[ri], p = payers[pi]
-    const amount = Math.min(r.diff, p.diff)
-    txs.push({ from: p.name, to: r.name, amount: Math.round(amount * 100) / 100 })
-    r.diff -= amount
-    p.diff -= amount
-    if (r.diff < 0.005) ri++
-    if (p.diff < 0.005) pi++
+  if (isPositive) {
+    // Income mode: house pays those who received less than average
+    const txs = totals
+      .filter(u => u.total < avg - 0.005)
+      .map(u => ({ to: u.name, amount: Math.round((avg - u.total) * 100) / 100 }))
+      .sort((a, b) => b.amount - a.amount)
+    return { txs, avg, isPositive }
+  } else {
+    // Expense mode: those who spent less transfer to those who spent more
+    const diffs = totals.map(u => ({ name: u.name, diff: Math.round((u.total - avg) * 100) / 100 }))
+    const receivers = diffs.filter(u => u.diff < -0.005).map(u => ({...u, diff: -u.diff})).sort((a,b) => b.diff - a.diff)
+    const payers    = diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
+    const txs = []
+    let ri = 0, pi = 0
+    while (ri < receivers.length && pi < payers.length) {
+      const r = receivers[ri], p = payers[pi]
+      const amount = Math.min(r.diff, p.diff)
+      txs.push({ from: p.name, to: r.name, amount: Math.round(amount * 100) / 100 })
+      r.diff -= amount; p.diff -= amount
+      if (r.diff < 0.005) ri++
+      if (p.diff < 0.005) pi++
+    }
+    return { txs, avg, isPositive }
   }
-  return { txs, avg }
 }
 
 // ── Saldos ────────────────────────────────────────────────────────────────────
@@ -847,7 +857,7 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
   const [editingName, setEditingName] = useState(null)
   const [tempName, setTempName] = useState('')
 
-  const { txs = [], avg = 0 } = saldos.length >= 2 ? settleDebts(saldos) : {}
+  const { txs = [], avg = 0, isPositive = false } = saldos.length >= 2 ? settleDebts(saldos) : {}
   const allZero = saldos.length >= 2 && txs.length === 0
 
   return (
@@ -883,16 +893,25 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
             <span className="text-xs text-gray-500">Média: <span className="font-semibold text-gray-700">{fmt(avg)}</span></span>
           </div>
           {allZero
-            ? <p className="text-green-700 text-sm">Cada um gastou exatamente {fmt(avg)}. Não há nada a transferir.</p>
+            ? <p className="text-green-700 text-sm">
+                {isPositive ? `Cada um recebeu exatamente ${fmt(avg)}.` : `Cada um gastou exatamente ${fmt(avg)}.`} Não há nada a acertar.
+              </p>
             : <>
-                <p className="text-xs text-gray-500 pb-1">{txs.length} transferência{txs.length !== 1 ? 's' : ''} necessária{txs.length !== 1 ? 's' : ''}:</p>
+                <p className="text-xs text-gray-500 pb-1">{txs.length} acerto{txs.length !== 1 ? 's' : ''} necessário{txs.length !== 1 ? 's' : ''}:</p>
                 {txs.map((tx, i) => (
                   <div key={i} className="flex items-center gap-2 bg-white rounded-xl px-3 py-3">
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-red-600">{tx.from}</span>
-                      <span className="text-gray-400 text-xs mx-1.5">→ transfere para →</span>
-                      <span className="font-semibold text-green-700">{tx.to}</span>
-                    </div>
+                    {isPositive
+                      ? <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-indigo-600">A casa</span>
+                          <span className="text-gray-400 text-xs mx-1.5">→ paga →</span>
+                          <span className="font-semibold text-green-700">{tx.to}</span>
+                        </div>
+                      : <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-red-600">{tx.from}</span>
+                          <span className="text-gray-400 text-xs mx-1.5">→ transfere para →</span>
+                          <span className="font-semibold text-green-700">{tx.to}</span>
+                        </div>
+                    }
                     <span className="font-bold text-gray-800 shrink-0">{fmt(tx.amount)}</span>
                   </div>
                 ))}
