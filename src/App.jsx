@@ -173,37 +173,38 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="font-bold text-gray-800">🏡 Gestão Casas SMP</h1>
-          <div className="flex gap-2 flex-wrap">
+        <div className="max-w-6xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+          <h1 className="font-bold text-gray-800 text-sm shrink-0">🏡 SMP</h1>
+          <div className="flex gap-1.5 flex-wrap justify-end">
             {houses.map((h, i) => (
               <button key={i}
                 onClick={() => setHouse(i)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition ${house === i ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${house === i ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {h}
               </button>
             ))}
           </div>
         </div>
         {/* Tabs */}
-        <div className="max-w-6xl mx-auto px-4 flex gap-1 pb-0 overflow-x-auto">
+        <div className="max-w-6xl mx-auto flex overflow-x-auto scrollbar-hide">
           {[
-            { key: 'dashboard', label: '📊 Dashboard' },
-            { key: 'income',    label: '💰 Rendimentos' },
-            { key: 'expenses',  label: '💸 Despesas' },
-            { key: 'saldos',    label: '🤝 Saldos' },
-            { key: 'settings',  label: '⚙️ Definições' },
+            { key: 'dashboard', label: '📊', full: 'Dashboard' },
+            { key: 'income',    label: '💰', full: 'Rendimentos' },
+            { key: 'expenses',  label: '💸', full: 'Despesas' },
+            { key: 'saldos',    label: '🤝', full: 'Saldos' },
+            { key: 'settings',  label: '⚙️', full: 'Definições' },
           ].map(t => (
             <button key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${tab === t.key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
-              {t.label}
+              className={`flex-1 min-w-0 px-2 py-2.5 text-xs font-medium border-b-2 transition whitespace-nowrap ${tab === t.key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}>
+              <span className="block">{t.label}</span>
+              <span className="block truncate">{t.full}</span>
             </button>
           ))}
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-3 py-4">
         {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} saldos={saldos} />}
         {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} editIncome={editIncome} houses={houses} />}
         {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} editExpense={editExpense} houses={houses} />}
@@ -396,31 +397,31 @@ function IncomeForm({ data, setData, onSave, onCancel, saveLabel, saveClass, upl
       <div>
         <label className="text-xs text-gray-500">Mês</label>
         <select value={data.month} onChange={e => setData(f => ({...f, month: Number(e.target.value)}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5">
           {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
       </div>
       <div>
         <label className="text-xs text-gray-500">Categoria</label>
         <select value={data.category} onChange={e => setData(f => ({...f, category: e.target.value}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5">
           {INCOME_CATS.map(c => <option key={c}>{c}</option>)}
         </select>
       </div>
       <div>
         <label className="text-xs text-gray-500">Valor (€)</label>
         <input type="text" inputMode="decimal" placeholder="0" value={data.amount} onChange={e => setData(f => ({...f, amount: e.target.value}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5" />
       </div>
       <div>
         <label className="text-xs text-gray-500">Notas</label>
         <input type="text" placeholder="Opcional" value={data.notes} onChange={e => setData(f => ({...f, notes: e.target.value}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5" />
       </div>
       <div className="col-span-2">
         <label className="text-xs text-gray-500">Anexo</label>
         <input type="file" onChange={e => setData(f => ({...f, file: e.target.files[0] || null}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5 bg-white" />
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5 bg-white" />
         {data.attachmentName && !data.file && (
           <p className="text-xs text-indigo-600 mt-1">📎 {data.attachmentName} (já anexado)</p>
         )}
@@ -607,31 +608,31 @@ function ExpenseForm({ data, setData, onSave, onCancel, saveLabel, saveClass, up
       <div>
         <label className="text-xs text-gray-500">Mês</label>
         <select value={data.month} onChange={e => setData(f => ({...f, month: Number(e.target.value)}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5">
           {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
       </div>
       <div>
         <label className="text-xs text-gray-500">Categoria</label>
         <select value={data.category} onChange={e => setData(f => ({...f, category: e.target.value}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5">
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5">
           {EXPENSE_CATS.map(c => <option key={c}>{c}</option>)}
         </select>
       </div>
       <div>
         <label className="text-xs text-gray-500">Valor (€)</label>
         <input type="text" inputMode="decimal" placeholder="0" value={data.amount} onChange={e => setData(f => ({...f, amount: e.target.value}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5" />
       </div>
       <div>
         <label className="text-xs text-gray-500">Notas</label>
         <input type="text" placeholder="Opcional" value={data.notes} onChange={e => setData(f => ({...f, notes: e.target.value}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5" />
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5" />
       </div>
       <div className="col-span-2">
         <label className="text-xs text-gray-500">Anexo</label>
         <input type="file" onChange={e => setData(f => ({...f, file: e.target.files[0] || null}))}
-          className="w-full border rounded-lg px-3 py-1.5 text-sm mt-0.5 bg-white" />
+          className="w-full border rounded-lg px-3 py-2 text-base mt-0.5 bg-white" />
         {data.attachmentName && !data.file && (
           <p className="text-xs text-indigo-600 mt-1">📎 {data.attachmentName} (já anexado)</p>
         )}
@@ -833,7 +834,7 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
           value={newName}
           onChange={e => setNewName(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) { addSaldoUser(newName.trim()); setNewName('') } }}
-          className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+          className="flex-1 border rounded-lg px-3 py-2 text-base"
         />
         <button
           onClick={() => { if (newName.trim()) { addSaldoUser(newName.trim()); setNewName('') } }}
@@ -1043,7 +1044,7 @@ function Settings({ settings, setSettings, saveSettings }) {
                 type="text"
                 value={h}
                 onChange={e => updateHouseName(i, e.target.value)}
-                className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+                className="flex-1 border rounded-lg px-3 py-2 text-base"
               />
               <button
                 onClick={() => removeHouse(i)}
@@ -1061,7 +1062,7 @@ function Settings({ settings, setSettings, saveSettings }) {
             value={newHouse}
             onChange={e => setNewHouse(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addHouse()}
-            className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+            className="flex-1 border rounded-lg px-3 py-2 text-base"
           />
           <button onClick={addHouse} className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-sm">
             + Adicionar
