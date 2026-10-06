@@ -868,7 +868,7 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
 function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName, onStartRename, onSaveRename, onCancelRename, onDelUser, addEntry, delEntry, editEntry }) {
   const total = user.entries.reduce((s, e) => s + parseAmount(e.amount), 0)
   const [adding, setAdding]     = useState(false)
-  const [form, setForm]         = useState({ amount: '', notes: '', sign: 1 })
+  const [form, setForm]         = useState({ amount: '', notes: '', sign: -1 })
   const [editId, setEditId]     = useState(null)
   const [editForm, setEditForm] = useState(null)
 
@@ -948,13 +948,13 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
           {adding
             ? <div className="space-y-2 pt-1">
                 <div className="flex gap-2">
-                  <button onClick={() => setForm(f => ({...f, sign: 1}))}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
-                    + Recebeu
-                  </button>
                   <button onClick={() => setForm(f => ({...f, sign: -1}))}
                     className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === -1 ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-300'}`}>
                     − Gastou
+                  </button>
+                  <button onClick={() => setForm(f => ({...f, sign: 1}))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition ${form.sign === 1 ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-300'}`}>
+                    + Recebeu
                   </button>
                 </div>
                 <div className="flex gap-2 items-center">
@@ -965,7 +965,7 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
                     onChange={e => setForm(f => ({...f, notes: e.target.value}))}
                     placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1.5 text-sm" />
                   <button onClick={handleAdd} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm">✓</button>
-                  <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '', sign: 1 }) }} className="text-gray-400 px-2 py-1.5 text-sm">✕</button>
+                  <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '', sign: -1 }) }} className="text-gray-400 px-2 py-1.5 text-sm">✕</button>
                 </div>
               </div>
             : <button onClick={() => setAdding(true)}
