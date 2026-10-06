@@ -824,28 +824,28 @@ function settleDebts(saldos) {
   const avg = Math.round(sum / totals.length * 100) / 100
   const isPositive = sum >= 0
 
-  // above avg = got/spent more = should receive; below avg = got/spent less = should pay
-  // for negatives: more negative = spent more = above in magnitude = receiver
   const diffs = totals.map(u => ({ name: u.name, diff: Math.round((u.total - avg) * 100) / 100 }))
-  const receivers = isPositive
-    ? diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
-    : diffs.filter(u => u.diff < -0.005).map(u => ({...u, diff: -u.diff})).sort((a,b) => b.diff - a.diff)
-  const payers = isPositive
-    ? diffs.filter(u => u.diff < -0.005).map(u => ({...u, diff: -u.diff})).sort((a,b) => b.diff - a.diff)
-    : diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
 
   const txs = []
-  let ri = 0, pi = 0
-  while (ri < receivers.length && pi < payers.length) {
-    const r = receivers[ri], p = payers[pi]
-    const amount = Math.min(r.diff, p.diff)
-    txs.push(isPositive
-      ? { to: r.name, amount: Math.round(amount * 100) / 100 }
-      : { from: p.name, to: r.name, amount: Math.round(amount * 100) / 100 }
-    )
-    r.diff -= amount; p.diff -= amount
-    if (r.diff < 0.005) ri++
-    if (p.diff < 0.005) pi++
+  if (isPositive) {
+    // House pays each person who received less than average
+    diffs.filter(u => u.diff < -0.005).forEach(u => {
+      txs.push({ to: u.name, amount: Math.round(-u.diff * 100) / 100 })
+    })
+  } else {
+    // User-to-user: those who spent less pay those who spent more
+    // more negative diff = spent more = receiver; more positive diff = spent less = payer
+    const receivers = diffs.filter(u => u.diff < -0.005).map(u => ({...u, diff: -u.diff})).sort((a,b) => b.diff - a.diff)
+    const payers    = diffs.filter(u => u.diff > 0.005).map(u => ({...u})).sort((a,b) => b.diff - a.diff)
+    let ri = 0, pi = 0
+    while (ri < receivers.length && pi < payers.length) {
+      const r = receivers[ri], p = payers[pi]
+      const amount = Math.min(r.diff, p.diff)
+      txs.push({ from: p.name, to: r.name, amount: Math.round(amount * 100) / 100 })
+      r.diff -= amount; p.diff -= amount
+      if (r.diff < 0.005) ri++
+      if (p.diff < 0.005) pi++
+    }
   }
   return { txs, avg, isPositive }
 }
