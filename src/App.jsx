@@ -5,6 +5,7 @@ import { storage, uploadFile, deleteFile } from './supabase'
 const K_INCOME   = 'income'
 const K_EXPENSES = 'expenses'
 const K_SETTINGS = 'settings'
+const K_SALDOS   = 'saldos'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DEFAULT_HOUSES = ['Casa 1', 'Casa 2']
@@ -41,6 +42,7 @@ export default function App() {
   const [income, setIncome]     = useState([])
   const [expenses, setExpenses] = useState([])
   const [settings, setSettings] = useState({ password: '', houses: DEFAULT_HOUSES })
+  const [saldos, setSaldos]     = useState([])
   const [loading, setLoading]   = useState(true)
   const [auth, setAuth]         = useState(false)
   const [pwInput, setPwInput]   = useState('')
@@ -49,13 +51,15 @@ export default function App() {
   // ── Load data ──────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
-      const [inc, exp, set_] = await Promise.all([
+      const [inc, exp, set_, sal] = await Promise.all([
         storage.get(K_INCOME),
         storage.get(K_EXPENSES),
-        storage.get(K_SETTINGS)
+        storage.get(K_SETTINGS),
+        storage.get(K_SALDOS)
       ])
       setIncome(inc   ? JSON.parse(inc.value)   : [])
       setExpenses(exp ? JSON.parse(exp.value)   : [])
+      setSaldos(sal   ? JSON.parse(sal.value)   : [])
       const s = set_ ? JSON.parse(set_.value) : { password: '', houses: DEFAULT_HOUSES }
       if (!s.houses) s.houses = DEFAULT_HOUSES
       setSettings(s)
@@ -86,6 +90,32 @@ export default function App() {
   const saveIncome   = useCallback(async d => { await storage.set(K_INCOME,   JSON.stringify(d)) }, [])
   const saveExpenses = useCallback(async d => { await storage.set(K_EXPENSES, JSON.stringify(d)) }, [])
   const saveSettings = useCallback(async d => { await storage.set(K_SETTINGS, JSON.stringify(d)) }, [])
+  const saveSaldos   = useCallback(async d => { await storage.set(K_SALDOS,   JSON.stringify(d)) }, [])
+
+  const addSaldoUser = async name => {
+    const next = [...saldos, { id: genId(), name, entries: [] }]
+    setSaldos(next); await saveSaldos(next)
+  }
+  const delSaldoUser = async id => {
+    const next = saldos.filter(u => u.id !== id)
+    setSaldos(next); await saveSaldos(next)
+  }
+  const renameSaldoUser = async (id, name) => {
+    const next = saldos.map(u => u.id === id ? { ...u, name } : u)
+    setSaldos(next); await saveSaldos(next)
+  }
+  const addSaldoEntry = async (userId, entry) => {
+    const next = saldos.map(u => u.id === userId ? { ...u, entries: [...u.entries, { ...entry, id: genId() }] } : u)
+    setSaldos(next); await saveSaldos(next)
+  }
+  const delSaldoEntry = async (userId, entryId) => {
+    const next = saldos.map(u => u.id === userId ? { ...u, entries: u.entries.filter(e => e.id !== entryId) } : u)
+    setSaldos(next); await saveSaldos(next)
+  }
+  const editSaldoEntry = async (userId, entryId, fields) => {
+    const next = saldos.map(u => u.id === userId ? { ...u, entries: u.entries.map(e => e.id === entryId ? { ...e, ...fields } : e) } : u)
+    setSaldos(next); await saveSaldos(next)
+  }
 
   const addIncome = async entry => {
     const next = [...income, { ...entry, id: genId() }]
@@ -161,6 +191,7 @@ export default function App() {
             { key: 'dashboard', label: '📊 Dashboard' },
             { key: 'income',    label: '💰 Rendimentos' },
             { key: 'expenses',  label: '💸 Despesas' },
+            { key: 'saldos',    label: '🤝 Saldos' },
             { key: 'settings',  label: '⚙️ Definições' },
           ].map(t => (
             <button key={t.key}
@@ -173,9 +204,10 @@ export default function App() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6">
-        {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} />}
+        {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} saldos={saldos} />}
         {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} editIncome={editIncome} houses={houses} />}
         {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} editExpense={editExpense} houses={houses} />}
+        {tab === 'saldos'    && <Saldos     saldos={saldos} addSaldoUser={addSaldoUser} delSaldoUser={delSaldoUser} renameSaldoUser={renameSaldoUser} addSaldoEntry={addSaldoEntry} delSaldoEntry={delSaldoEntry} editSaldoEntry={editSaldoEntry} />}
         {tab === 'settings'  && <Settings   settings={settings} setSettings={setSettings} saveSettings={saveSettings} />}
       </main>
     </div>
@@ -194,7 +226,7 @@ function YearSelector({ year, setYear }) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-function Dashboard({ house, year, setYear, income, expenses, houses }) {
+function Dashboard({ house, year, setYear, income, expenses, houses, saldos }) {
   const [openCat, setOpenCat]       = useState(null)
   const [openIncCat, setOpenIncCat] = useState(null)
 
@@ -328,6 +360,22 @@ function Dashboard({ house, year, setYear, income, expenses, houses }) {
             </>
         }
       </div>
+
+      {/* Saldos resumo */}
+      {saldos.length > 0 && (
+        <div className="bg-white rounded-xl p-5 shadow-sm space-y-2">
+          <h3 className="font-semibold text-gray-700 mb-1">Saldos</h3>
+          {saldos.map(u => {
+            const total = u.entries.reduce((s, e) => s + parseAmount(e.amount), 0)
+            return (
+              <div key={u.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                <span className="text-sm text-gray-700">{u.name}</span>
+                <span className={`font-semibold text-sm ${total >= 0 ? 'text-green-600' : 'text-red-500'}`}>{fmt(total)}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -760,6 +808,160 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
             </div>
           </>
       }
+    </div>
+  )
+}
+
+// ── Saldos ────────────────────────────────────────────────────────────────────
+function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoEntry, delSaldoEntry, editSaldoEntry }) {
+  const [newName, setNewName]   = useState('')
+  const [openUser, setOpenUser] = useState(null)
+  const [editingName, setEditingName] = useState(null)
+  const [tempName, setTempName] = useState('')
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-800">Saldos</h2>
+      </div>
+
+      {/* Adicionar utilizador */}
+      <div className="bg-white rounded-xl p-4 shadow-sm flex gap-2">
+        <input
+          type="text"
+          placeholder="Nome do utilizador"
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) { addSaldoUser(newName.trim()); setNewName('') } }}
+          className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+        />
+        <button
+          onClick={() => { if (newName.trim()) { addSaldoUser(newName.trim()); setNewName('') } }}
+          className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700">
+          + Utilizador
+        </button>
+      </div>
+
+      {saldos.length === 0
+        ? <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">Sem utilizadores. Adiciona um acima.</div>
+        : saldos.map(u => (
+            <SaldoUser key={u.id} user={u}
+              isOpen={openUser === u.id}
+              onToggle={() => setOpenUser(openUser === u.id ? null : u.id)}
+              editingName={editingName === u.id}
+              tempName={tempName}
+              setTempName={setTempName}
+              onStartRename={() => { setEditingName(u.id); setTempName(u.name) }}
+              onSaveRename={() => { renameSaldoUser(u.id, tempName); setEditingName(null) }}
+              onCancelRename={() => setEditingName(null)}
+              onDelUser={() => { if (confirm(`Apagar "${u.name}" e todos os seus lançamentos?`)) delSaldoUser(u.id) }}
+              addEntry={entry => addSaldoEntry(u.id, entry)}
+              delEntry={entryId => delSaldoEntry(u.id, entryId)}
+              editEntry={(entryId, fields) => editSaldoEntry(u.id, entryId, fields)}
+            />
+          ))
+      }
+    </div>
+  )
+}
+
+function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName, onStartRename, onSaveRename, onCancelRename, onDelUser, addEntry, delEntry, editEntry }) {
+  const total = user.entries.reduce((s, e) => s + parseAmount(e.amount), 0)
+  const [adding, setAdding]     = useState(false)
+  const [form, setForm]         = useState({ amount: '', notes: '' })
+  const [editId, setEditId]     = useState(null)
+  const [editForm, setEditForm] = useState(null)
+
+  const handleAdd = () => {
+    if (!form.amount) return
+    addEntry({ amount: form.amount, notes: form.notes, date: new Date().toISOString().slice(0,10) })
+    setForm({ amount: '', notes: '' }); setAdding(false)
+  }
+
+  const startEdit = e => { setEditId(e.id); setEditForm({ amount: String(e.amount), notes: e.notes || '' }) }
+  const handleEdit = () => { if (!editForm.amount) return; editEntry(editId, editForm); setEditId(null); setEditForm(null) }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      {/* Header do utilizador */}
+      <div className="flex items-center justify-between px-4 py-3 border-b">
+        {editingName
+          ? <div className="flex gap-2 flex-1 mr-2">
+              <input value={tempName} onChange={e => setTempName(e.target.value)} autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') onSaveRename(); if (e.key === 'Escape') onCancelRename() }}
+                className="flex-1 border rounded-lg px-2 py-1 text-sm" />
+              <button onClick={onSaveRename} className="text-indigo-600 text-sm font-medium">✓</button>
+              <button onClick={onCancelRename} className="text-gray-400 text-sm">✕</button>
+            </div>
+          : <button onClick={onToggle} className="flex-1 text-left font-semibold text-gray-800 text-sm">{user.name}</button>
+        }
+        <div className="flex items-center gap-3">
+          <span className={`font-bold text-sm ${total >= 0 ? 'text-green-600' : 'text-red-500'}`}>{fmt(total)}</span>
+          {!editingName && <>
+            <button onClick={onStartRename} className="text-gray-400 hover:text-indigo-500 text-sm">✎</button>
+            <button onClick={onDelUser} className="text-gray-400 hover:text-red-500 text-sm">✕</button>
+            <button onClick={onToggle} className="text-gray-400 text-xs">{isOpen ? '▲' : '▼'}</button>
+          </>}
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="p-4 space-y-3">
+          {/* Lançamentos */}
+          {user.entries.length === 0 && !adding
+            ? <p className="text-gray-400 text-sm text-center py-2">Sem lançamentos</p>
+            : <div className="space-y-2">
+                {user.entries.map(e => (
+                  <div key={e.id}>
+                    {editId === e.id
+                      ? <div className="flex gap-2 items-center">
+                          <input type="text" inputMode="decimal" value={editForm.amount}
+                            onChange={ev => setEditForm(f => ({...f, amount: ev.target.value}))}
+                            placeholder="Valor" className="w-24 border rounded-lg px-2 py-1 text-sm" />
+                          <input type="text" value={editForm.notes}
+                            onChange={ev => setEditForm(f => ({...f, notes: ev.target.value}))}
+                            placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1 text-sm" />
+                          <button onClick={handleEdit} className="text-indigo-600 text-sm font-medium">✓</button>
+                          <button onClick={() => { setEditId(null); setEditForm(null) }} className="text-gray-400 text-sm">✕</button>
+                        </div>
+                      : <div className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded-lg">
+                          <div className="text-sm">
+                            <span className="text-gray-400 text-xs mr-2">{e.date}</span>
+                            {e.notes && <span className="text-gray-600">{e.notes}</span>}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`font-semibold text-sm ${parseAmount(e.amount) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                              {parseAmount(e.amount) >= 0 ? '+' : ''}{fmt(e.amount)}
+                            </span>
+                            <button onClick={() => startEdit(e)} className="text-indigo-400 hover:text-indigo-600 text-xs">✎</button>
+                            <button onClick={() => delEntry(e.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                          </div>
+                        </div>
+                    }
+                  </div>
+                ))}
+              </div>
+          }
+
+          {/* Formulário novo lançamento */}
+          {adding
+            ? <div className="flex gap-2 items-center pt-1">
+                <input type="text" inputMode="decimal" value={form.amount}
+                  onChange={e => setForm(f => ({...f, amount: e.target.value}))}
+                  placeholder="Valor (+/-)" className="w-28 border rounded-lg px-2 py-1.5 text-sm" />
+                <input type="text" value={form.notes}
+                  onChange={e => setForm(f => ({...f, notes: e.target.value}))}
+                  placeholder="Notas" className="flex-1 border rounded-lg px-2 py-1.5 text-sm" />
+                <button onClick={handleAdd} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm">✓</button>
+                <button onClick={() => { setAdding(false); setForm({ amount: '', notes: '' }) }} className="text-gray-400 px-2 py-1.5 text-sm">✕</button>
+              </div>
+            : <button onClick={() => setAdding(true)}
+                className="w-full text-sm text-indigo-600 hover:text-indigo-800 py-1.5 border border-dashed border-indigo-300 rounded-lg hover:bg-indigo-50 transition">
+                + Lançamento
+              </button>
+          }
+        </div>
+      )}
     </div>
   )
 }
