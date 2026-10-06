@@ -813,12 +813,39 @@ function Expenses({ house, year, setYear, expenses, addExpense, delExpense, edit
   )
 }
 
+// ── Settle debts algorithm (minimum transactions) ─────────────────────────────
+function settleDebts(saldos) {
+  const balances = saldos.map(u => ({
+    name: u.name,
+    bal: Math.round(u.entries.reduce((s, e) => s + parseAmount(e.amount), 0) * 100) / 100
+  })).filter(u => Math.abs(u.bal) > 0.005)
+
+  const creditors = balances.filter(u => u.bal > 0).map(u => ({...u})).sort((a,b) => b.bal - a.bal)
+  const debtors   = balances.filter(u => u.bal < 0).map(u => ({...u})).sort((a,b) => a.bal - b.bal)
+
+  const txs = []
+  let ci = 0, di = 0
+  while (ci < creditors.length && di < debtors.length) {
+    const c = creditors[ci], d = debtors[di]
+    const amount = Math.min(c.bal, -d.bal)
+    txs.push({ from: d.name, to: c.name, amount: Math.round(amount * 100) / 100 })
+    c.bal -= amount
+    d.bal += amount
+    if (Math.abs(c.bal) < 0.005) ci++
+    if (Math.abs(d.bal) < 0.005) di++
+  }
+  return txs
+}
+
 // ── Saldos ────────────────────────────────────────────────────────────────────
 function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoEntry, delSaldoEntry, editSaldoEntry }) {
   const [newName, setNewName]   = useState('')
   const [openUser, setOpenUser] = useState(null)
   const [editingName, setEditingName] = useState(null)
   const [tempName, setTempName] = useState('')
+
+  const txs = settleDebts(saldos)
+  const allZero = saldos.length > 0 && txs.length === 0
 
   return (
     <div className="space-y-4">
@@ -838,10 +865,30 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
         />
         <button
           onClick={() => { if (newName.trim()) { addSaldoUser(newName.trim()); setNewName('') } }}
-          className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-indigo-700">
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium">
           + Utilizador
         </button>
       </div>
+
+      {/* Liquidação */}
+      {saldos.length >= 2 && (
+        <div className={`rounded-xl p-4 shadow-sm space-y-2 ${allZero ? 'bg-green-50' : 'bg-amber-50'}`}>
+          <h3 className="font-semibold text-gray-700 text-sm">
+            {allZero ? '✅ Contas equilibradas' : `⚖️ Para acertar contas (${txs.length} movimento${txs.length !== 1 ? 's' : ''})`}
+          </h3>
+          {allZero
+            ? <p className="text-green-700 text-sm">Todos os saldos estão a zero. Não há nada a acertar.</p>
+            : txs.map((tx, i) => (
+                <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2.5">
+                  <span className="font-medium text-red-600 text-sm">{tx.from}</span>
+                  <span className="text-gray-400 text-xs">→ paga →</span>
+                  <span className="font-medium text-green-700 text-sm">{tx.to}</span>
+                  <span className="ml-auto font-bold text-gray-800 text-sm">{fmt(tx.amount)}</span>
+                </div>
+              ))
+          }
+        </div>
+      )}
 
       {saldos.length === 0
         ? <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-400 text-sm">Sem utilizadores. Adiciona um acima.</div>
