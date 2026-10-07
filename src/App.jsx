@@ -208,7 +208,7 @@ export default function App() {
         {tab === 'dashboard' && <Dashboard  house={house} year={year} setYear={setYear} income={income} expenses={expenses} houses={houses} saldos={saldos} />}
         {tab === 'income'    && <Income     house={house} year={year} setYear={setYear} income={income} addIncome={addIncome} delIncome={delIncome} editIncome={editIncome} houses={houses} />}
         {tab === 'expenses'  && <Expenses   house={house} year={year} setYear={setYear} expenses={expenses} addExpense={addExpense} delExpense={delExpense} editExpense={editExpense} houses={houses} />}
-        {tab === 'saldos'    && <Saldos     saldos={saldos} addSaldoUser={addSaldoUser} delSaldoUser={delSaldoUser} renameSaldoUser={renameSaldoUser} addSaldoEntry={addSaldoEntry} delSaldoEntry={delSaldoEntry} editSaldoEntry={editSaldoEntry} />}
+        {tab === 'saldos'    && <Saldos     saldos={saldos} addSaldoUser={addSaldoUser} delSaldoUser={delSaldoUser} addSaldoEntry={addSaldoEntry} delSaldoEntry={delSaldoEntry} editSaldoEntry={editSaldoEntry} />}
         {tab === 'settings'  && <Settings   settings={settings} setSettings={setSettings} saveSettings={saveSettings} />}
       </main>
     </div>
@@ -853,11 +853,9 @@ function settleDebts(saldos) {
 }
 
 // ── Saldos ────────────────────────────────────────────────────────────────────
-function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoEntry, delSaldoEntry, editSaldoEntry }) {
+function Saldos({ saldos, addSaldoUser, delSaldoUser, addSaldoEntry, delSaldoEntry, editSaldoEntry }) {
   const [newName, setNewName]   = useState('')
   const [openUser, setOpenUser] = useState(null)
-  const [editingName, setEditingName] = useState(null)
-  const [tempName, setTempName] = useState('')
 
   const { txs = [], avg = 0, isPositive = false } = saldos.length >= 2 ? settleDebts(saldos) : {}
   const allZero = saldos.length >= 2 && txs.length === 0
@@ -928,12 +926,6 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
             <SaldoUser key={u.id} user={u}
               isOpen={openUser === u.id}
               onToggle={() => setOpenUser(openUser === u.id ? null : u.id)}
-              editingName={editingName === u.id}
-              tempName={tempName}
-              setTempName={setTempName}
-              onStartRename={() => { setEditingName(u.id); setTempName(u.name) }}
-              onSaveRename={() => { renameSaldoUser(u.id, tempName); setEditingName(null) }}
-              onCancelRename={() => setEditingName(null)}
               onDelUser={() => { if (confirm(`Apagar "${u.name}" e todos os seus lançamentos?`)) delSaldoUser(u.id) }}
               addEntry={entry => addSaldoEntry(u.id, entry)}
               delEntry={entryId => delSaldoEntry(u.id, entryId)}
@@ -945,7 +937,7 @@ function Saldos({ saldos, addSaldoUser, delSaldoUser, renameSaldoUser, addSaldoE
   )
 }
 
-function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName, onStartRename, onSaveRename, onCancelRename, onDelUser, addEntry, delEntry, editEntry }) {
+function SaldoUser({ user, isOpen, onToggle, onDelUser, addEntry, delEntry, editEntry }) {
   const total = user.entries.reduce((s, e) => s + parseAmount(e.amount), 0)
   const [adding, setAdding]     = useState(false)
   const [form, setForm]         = useState({ amount: '', notes: '', sign: -1 })
@@ -971,23 +963,11 @@ function SaldoUser({ user, isOpen, onToggle, editingName, tempName, setTempName,
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
       {/* Header do utilizador */}
       <div className="flex items-center justify-between px-4 py-4 border-b">
-        {editingName
-          ? <div className="flex gap-2 flex-1 mr-2">
-              <input value={tempName} onChange={e => setTempName(e.target.value)} autoFocus
-                onKeyDown={e => { if (e.key === 'Enter') onSaveRename(); if (e.key === 'Escape') onCancelRename() }}
-                className="flex-1 border rounded-lg px-3 py-2 text-base" />
-              <button onClick={onSaveRename} className="text-indigo-600 text-xl font-medium px-2">✓</button>
-              <button onClick={onCancelRename} className="text-gray-400 text-xl px-2">✕</button>
-            </div>
-          : <button onClick={onToggle} className="flex-1 text-left font-semibold text-gray-800">{user.name}</button>
-        }
+        <button onClick={onToggle} className="flex-1 text-left font-semibold text-gray-800">{user.name}</button>
         <div className="flex items-center gap-3">
           <span className={`font-bold ${total >= 0 ? 'text-green-600' : 'text-red-500'}`}>{fmt(total)}</span>
-          {!editingName && <>
-            <button onClick={onStartRename} className="text-gray-400 hover:text-indigo-500 text-xl p-1">✎</button>
-            <button onClick={onDelUser} className="text-gray-400 hover:text-red-500 text-xl p-1">✕</button>
-            <button onClick={onToggle} className="text-gray-500 text-sm p-1">{isOpen ? '▲' : '▼'}</button>
-          </>}
+          <button onClick={onDelUser} className="text-gray-400 hover:text-red-500 text-xl p-1">✕</button>
+          <button onClick={onToggle} className="text-gray-500 text-sm p-1">{isOpen ? '▲' : '▼'}</button>
         </div>
       </div>
 
